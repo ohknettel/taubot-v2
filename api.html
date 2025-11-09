@@ -1,0 +1,724 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="./" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>API &#8212; Taubot V2 Documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8f2a1f02" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'api';</script>
+    <link rel="icon" href="_static/favicon.png"/>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Usage" href="usage.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="_static/logo.png" class="logo__image only-light" alt=""/>
+    <img src="_static/logo.png" class="logo__image only-dark pst-js-only" alt=""/>
+  
+  
+    <p class="title logo__title">Taubot V2 Documentation</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="usage.html">
+    Usage
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="#">
+    API
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar hide-on-wide">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="usage.html">
+    Usage
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="#">
+    API
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">API</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="api">
+<h1>API<a class="headerlink" href="#api" title="Link to this heading">#</a></h1>
+<p>Taubot exposes a HTTPS API available at <a class="reference external" href="https://tau.work.gd/api/">https://tau.work.gd/api/</a>.</p>
+<p>All data unless otherwise specified should be sent using JSON encoding.</p>
+<section id="authentication">
+<h2>Authentication<a class="headerlink" href="#authentication" title="Link to this heading">#</a></h2>
+<p>DM SoTech Lon to get a master application key and it’s associated application ID.</p>
+<p>Types of keys:</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<colgroup>
+<col style="width: 50.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Master Key</p></th>
+<th class="head"><p>Grant Key</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Master keys are issued to applications, if requested they can be granted certain taubot permissions, but are notable for their ability to create GRANT keys</p></td>
+<td><p>Grant keys are issued by a user to an application, it allows them to grant a subset of their taubot permissions to an application</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The key being used to make a request should be set as the <code class="code docutils literal notranslate"><span class="pre">authorization</span></code> HTTP header.</p>
+</section>
+<section id="oauth-like-flow-overview">
+<h2>Oauth-like flow overview<a class="headerlink" href="#oauth-like-flow-overview" title="Link to this heading">#</a></h2>
+<p>(name suggestions are greatly appreciated)</p>
+<p>This section pretains to the distribution of Grant Keys to applications.</p>
+<p>The flow is as follows:</p>
+<blockquote>
+<div><ol class="arabic simple">
+<li><p>Application initiates proccess py posting a UUID identifier to <code class="code docutils literal notranslate"><span class="pre">/api/oauth-references</span></code>, and sends the user a link containing the UUID in a query string along with their application ID.</p></li>
+<li><p>User clicks link and sets the grant scopes they wish to grant to the API.</p></li>
+<li><p>User returns to application and confirms that they’ve completed the grant process.</p></li>
+<li><p>Application gets <code class="code docutils literal notranslate"><span class="pre">/api/retrieve-key/{reference_id}</span></code> where reference ID is the ID they set in their post request.</p></li>
+</ol>
+</div></blockquote>
+<section id="starting-the-oauth-like-flow">
+<h3>Starting the oauth-like flow<a class="headerlink" href="#starting-the-oauth-like-flow" title="Link to this heading">#</a></h3>
+<p>As mentioned above the application should send a post request to <code class="code docutils literal notranslate"><span class="pre">/api/oauth-references</span></code>
+containing a UUID used to identify this particular flow.</p>
+<p>This UUID should be sent in the POST body json encoded with the key <code class="code docutils literal notranslate"><span class="pre">ref_id</span></code>.</p>
+<p>Afterwards, a URL should be sent to the user granting the application permissions. The same reference ID should be included in the querystring, labelled <code class="code docutils literal notranslate"><span class="pre">ref_id</span></code>. the application ID should also be sent in the querystring and labelled <code class="code docutils literal notranslate"><span class="pre">aid</span></code>.</p>
+<p><em>Example Python Code using requests</em></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">uuid</span><span class="w"> </span><span class="kn">import</span> <span class="n">UUID</span>
+
+<span class="c1"># for obvious reasons these should be loaded from a config rather than hardcoded</span>
+<span class="n">master_key</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;master key goes here&quot;</span>
+<span class="n">application_id</span><span class="p">:</span> <span class="n">UUID</span> <span class="o">=</span> <span class="n">UUID</span><span class="p">(</span><span class="s2">&quot;application ID goes here&quot;</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">get_auth_link</span><span class="p">(</span><span class="n">ref_id</span><span class="p">:</span> <span class="n">UUID</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="n">resp</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span>
+         <span class="s2">&quot;https://qwrky.dev/api/oauth-references&quot;</span><span class="p">,</span>
+         <span class="n">data</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;ref_id&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">ref_id</span><span class="p">)},</span>
+         <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="n">master_key</span><span class="p">}</span>
+    <span class="p">)</span>
+    <span class="n">resp</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
+
+    <span class="c1"># since uuids are urlsafe this is fine</span>
+    <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;https://qwrky.dev/api/oauth/grant?ref=</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">ref_id</span><span class="p">)</span><span class="si">}</span><span class="s2">&amp;aid=</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">application_id</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+</pre></div>
+</div>
+<p>Once the user has completed the grant process, they should inform the application somehow so that the application can then retrieve their token.</p>
+</section>
+<section id="retrieving-a-token">
+<h3>Retrieving a token<a class="headerlink" href="#retrieving-a-token" title="Link to this heading">#</a></h3>
+<p>Now that the user has confirmed with the application the token has been isued and it’s time for the application to retrieve it’s token</p>
+<p>This should be done by sending a get request to <code class="code docutils literal notranslate"><span class="pre">/api/retrieve-key/{ref_id}</span></code> where <code class="code docutils literal notranslate"><span class="pre">ref_id</span></code> is the same UUID used to initiate the claim process.</p>
+<p>The response will be json data with the new auth key set as the <code class="code docutils literal notranslate"><span class="pre">key</span></code> attribute.</p>
+<p>This key will have the same permissions the user set.</p>
+<p><em>Example Python code using requests</em></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">uuid</span><span class="w"> </span><span class="kn">import</span> <span class="n">UUID</span>
+
+<span class="c1"># for obvious reasons these should be loaded from a config rather than hardcoded</span>
+<span class="n">master_key</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;master key goes here&quot;</span>
+<span class="n">application_id</span><span class="p">:</span> <span class="n">UUID</span> <span class="o">=</span> <span class="n">UUID</span><span class="p">(</span><span class="s2">&quot;application ID goes here&quot;</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">retrieve_key</span><span class="p">(</span><span class="n">ref_id</span><span class="p">:</span> <span class="n">UUID</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+   <span class="c1"># since UUIDs are urlsafe this is fine</span>
+   <span class="n">resp</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;https://qwrky.dev/api/retrieve-key/</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">ref_id</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="n">headers</span> <span class="o">=</span> <span class="p">{}</span>
+   <span class="p">)</span>
+   <span class="n">resp</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
+
+   <span class="k">return</span> <span class="n">resp</span><span class="o">.</span><span class="n">json</span><span class="p">()[</span><span class="s2">&quot;key&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>This token should be persisted somewhere, and used to make requests on behalf of the issuer.</p>
+</section>
+</section>
+<section id="api-reference">
+<h2>API Reference<a class="headerlink" href="#api-reference" title="Link to this heading">#</a></h2>
+<section id="response-types">
+<h3>Response Types<a class="headerlink" href="#response-types" title="Link to this heading">#</a></h3>
+<section id="account">
+<h4>Account<a class="headerlink" href="#account" title="Link to this heading">#</a></h4>
+<div class="pst-scrollable-table-container"><table class="table" id="id1">
+<caption><span class="caption-text">Account Response Structure</span><a class="headerlink" href="#id1" title="Link to this table">#</a></caption>
+<colgroup>
+<col style="width: 22.2%" />
+<col style="width: 22.2%" />
+<col style="width: 55.6%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head stub"><p>Key</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><th class="stub"><p>account_id</p></th>
+<td><p>String</p></td>
+<td><p>The account’s UUID encoded as a string</p></td>
+</tr>
+<tr class="row-odd"><th class="stub"><p>owner_id</p></th>
+<td><p>String</p></td>
+<td><p>The owner’s discord id encoded as a string since some programming languages can mess up ints that big</p></td>
+</tr>
+<tr class="row-even"><th class="stub"><p>account_name</p></th>
+<td><p>String</p></td>
+<td><p>The name of the account</p></td>
+</tr>
+<tr class="row-odd"><th class="stub"><p>account_type</p></th>
+<td><p>String</p></td>
+<td><p>The type of account, see the Account Type section below for more info</p></td>
+</tr>
+<tr class="row-even"><th class="stub"><p>balance</p></th>
+<td><p>Integer</p></td>
+<td><p>The balance of the account in cents - i.e. 100 would be 1t and 101 would be 1.01t</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="account-type">
+<h4>Account Type<a class="headerlink" href="#account-type" title="Link to this heading">#</a></h4>
+<div class="pst-scrollable-table-container"><table class="table" id="id2">
+<caption><span class="caption-text">Account Type</span><a class="headerlink" href="#id2" title="Link to this table">#</a></caption>
+<colgroup>
+<col style="width: 28.6%" />
+<col style="width: 71.4%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head stub"><p>Name</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><th class="stub"><p>USER</p></th>
+<td><p>An account type used to represent user accounts on the discord, is used exclusively for personal accounts</p></td>
+</tr>
+<tr class="row-odd"><th class="stub"><p>GOVERNMENT</p></th>
+<td><p>An account type used to represent government accounts</p></td>
+</tr>
+<tr class="row-even"><th class="stub"><p>CORPORATION</p></th>
+<td><p>An account type used to represent corporate accounts</p></td>
+</tr>
+<tr class="row-odd"><th class="stub"><p>CHARITY</p></th>
+<td><p>An account type used by non-profit accounts</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="transaction">
+<h4>Transaction<a class="headerlink" href="#transaction" title="Link to this heading">#</a></h4>
+<div class="pst-scrollable-table-container"><table class="table" id="id3">
+<caption><span class="caption-text">Transaction</span><a class="headerlink" href="#id3" title="Link to this table">#</a></caption>
+<colgroup>
+<col style="width: 22.2%" />
+<col style="width: 22.2%" />
+<col style="width: 55.6%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head stub"><p>Key</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><th class="stub"><p>actor_id</p></th>
+<td><p>String</p></td>
+<td><p>The person who performed the transactions discord user id encoded as a string</p></td>
+</tr>
+<tr class="row-odd"><th class="stub"><p>timestamp</p></th>
+<td><p>Integer</p></td>
+<td><p>The unix timestamp of when the transaction took place</p></td>
+</tr>
+<tr class="row-even"><th class="stub"><p>from_account</p></th>
+<td><p>String</p></td>
+<td><p>The account UUID of the account the money was transferred from</p></td>
+</tr>
+<tr class="row-odd"><th class="stub"><p>to_account</p></th>
+<td><p>String</p></td>
+<td><p>The account UUID of the account the money was sent to</p></td>
+</tr>
+<tr class="row-even"><th class="stub"><p>amount</p></th>
+<td><p>Integer</p></td>
+<td><p>The amount in cents that was transferred</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</section>
+<section id="endpoints">
+<h3>Endpoints<a class="headerlink" href="#endpoints" title="Link to this heading">#</a></h3>
+<p>Here’s an overview of all the requests you can currently make to the API.</p>
+<dl class="http get">
+<dt class="sig sig-object http" id="get--api-users-(int-user_id)">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/api/users/</span></span><span class="sig-paren">(</span><em class="property"><span class="pre">int:</span> </em><em class="sig-param"><span class="pre">user_id</span></em><span class="sig-paren">)</span><a class="headerlink" href="#get--api-users-(int-user_id)" title="Link to this definition">#</a></dt>
+<dd><p>Returns the personal account of <code class="code docutils literal notranslate"><span class="pre">user_id</span></code> if it could be found.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Status Codes<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1">200 OK</a></span> – Returns an Account object</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.5">404 Not Found</a></span> – A personal account registered to that user could not be found.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="http get">
+<dt class="sig sig-object http" id="get--api-accounts-by-name-(str-account_name)">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/api/accounts/by-name/</span></span><span class="sig-paren">(</span><em class="property"><span class="pre">str:</span> </em><em class="sig-param"><span class="pre">account_name</span></em><span class="sig-paren">)</span><a class="headerlink" href="#get--api-accounts-by-name-(str-account_name)" title="Link to this definition">#</a></dt>
+<dd><p>Returns the account of name <code class="code docutils literal notranslate"><span class="pre">account_name</span></code> if it could be found</p>
+<dl class="field-list simple">
+<dt class="field-odd">Status Codes<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1">200 OK</a></span> – Returns an Account object</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.5">404 Not Found</a></span> – An account by that name could not be found</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="http get">
+<dt class="sig sig-object http" id="get--api-accounts-(UUID-account_id)">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/api/accounts/</span></span><span class="sig-paren">(</span><em class="property"><span class="pre">UUID:</span> </em><em class="sig-param"><span class="pre">account_id</span></em><span class="sig-paren">)</span><a class="headerlink" href="#get--api-accounts-(UUID-account_id)" title="Link to this definition">#</a></dt>
+<dd><p>Returns the account of uuid <code class="code docutils literal notranslate"><span class="pre">account_id</span></code> if it could be found</p>
+<dl class="field-list simple">
+<dt class="field-odd">Status Codes<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1">200 OK</a></span> – Retruns an Account object</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.5">404 Not Found</a></span> – An account by that name could not be found</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="http get">
+<dt class="sig sig-object http" id="get--api-accounts-(UUID-account_id)-transactions">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/api/accounts/</span></span><span class="sig-paren">(</span><em class="property"><span class="pre">UUID:</span> </em><em class="sig-param"><span class="pre">account_id</span></em><span class="sig-paren">)</span><span class="sig-name descname"><span class="pre">/transactions</span></span><a class="headerlink" href="#get--api-accounts-(UUID-account_id)-transactions" title="Link to this definition">#</a></dt>
+<dd><p>Returns a list of the Transactions to and from that account</p>
+<dl class="field-list simple">
+<dt class="field-odd">Query Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>limit</strong> – optional limit paramater, specifies the maximum number of transactions to return</p></li>
+</ul>
+</dd>
+<dt class="field-even">Status Codes<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1">200 OK</a></span> – Returns a JSON list of Transaction objects</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.5">404 Not Found</a></span> – The account specified could not be found</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.2">401 Unauthorized</a></span> – You do not have the necessary permissions (<code class="code docutils literal notranslate"><span class="pre">VIEW_BALANCE</span></code>) to view the transaction log</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="http post">
+<dt class="sig sig-object http" id="post--api-transactions-">
+<span class="sig-name descname"><span class="pre">POST</span> </span><span class="sig-name descname"><span class="pre">/api/transactions/</span></span><a class="headerlink" href="#post--api-transactions-" title="Link to this definition">#</a></dt>
+<dd><p>Creates a new transaction</p>
+<dl class="field-list simple">
+<dt class="field-odd">JSON Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>from_account</strong> (<em>string</em>) – The account UUID to transfer money from</p></li>
+<li><p><strong>to_account</strong> (<em>string</em>) – The account UUID to transfer money to</p></li>
+<li><p><strong>amount</strong> (<em>int</em>) – The amount in cents to transfer</p></li>
+</ul>
+</dd>
+<dt class="field-even">Status Codes<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1">200 OK</a></span> – Transaction was created sucessfully</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.5">404 Not Found</a></span> – One of the accounts could not be found</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.2">401 Unauthorized</a></span> – Your key doesn’t grant you sufficient permissions to make this transaction</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="usage.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Usage</p>
+      </div>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#authentication">Authentication</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#oauth-like-flow-overview">Oauth-like flow overview</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#starting-the-oauth-like-flow">Starting the oauth-like flow</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#retrieving-a-token">Retrieving a token</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#api-reference">API Reference</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#response-types">Response Types</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#account">Account</a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#account-type">Account Type</a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#transaction">Transaction</a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#endpoints">Endpoints</a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2025, Some Stoner.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>
