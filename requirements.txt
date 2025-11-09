@@ -1,5 +1,6 @@
 SQLAlchemy~=2.0.38
 discord~=2.3.2
+psycopg2-binary
 pyjwt~=2.10.1
 cryptography
 aiohttp~=3.11.13
