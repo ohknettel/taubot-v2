@@ -3,8 +3,8 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Taubot V2 Documentation
-=======================
+Index
+=====
 
 **Taubot** is a discord bot built for and by the `SimDemocracy <https://reddit.com/r/simdemocracy>`_ community.
 
