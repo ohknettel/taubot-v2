@@ -51,12 +51,12 @@ Once you've this done you should create your config.json, a redacted version of 
         "public_webhook_url": "Webhook URL for transactions by government officials to be sent too",
         "api": true,
         "oauth": {
-                "redirect_url": "https://discord.com/oauth2/authorize?client_id=1236137854128623677&response_type=code&redirect_uri=https%3A%2F%2Fqwrky.dev%2Fapi%2Foauth%2Foauth-callback&scope=identify",
-                "redirect_uri": "https://qwrky.dev/api/oauth/oauth-callback",
+                "redirect_url": "https://discord.com/oauth2/authorize?client_id=1236137854128623677&response_type=code&redirect_uri=https%3A%2F%2Ftaubot.qzz.io%2Fapi%2Foauth%2Foauth-callback&scope=identify",
+                "redirect_uri": "https://taubot.qzz.io/api/oauth/oauth-callback",
                 "client_id": "1236137854128623677",
                 "client_secret": "Your oauth secret here"
         },
-        "static_uri": "https://qwrky.dev/static"
+        "static_uri": "https://taubot.qzz.io/static"
     }
 
 

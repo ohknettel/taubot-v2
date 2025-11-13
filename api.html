@@ -9,12 +9,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta property="og:title" content="API" />
 <meta property="og:type" content="website" />
-<meta property="og:url" content="https://docs.tau.work.gd/api.html" />
+<meta property="og:url" content="https://docs.taubot.qzz.io/api.html" />
 <meta property="og:site_name" content="Taubot V2 Documentation" />
-<meta property="og:description" content="Taubot exposes a HTTPS API available at https://tau.work.gd/api/. All data unless otherwise specified should be sent using JSON encoding. Authentication: DM SoTech Lon to get a master application k..." />
-<meta property="og:image" content="https://docs.tau.work.gd/_static/logo.png" />
+<meta property="og:description" content="Taubot exposes a HTTPS API available at https://taubot.qzz.io/api/. All data unless otherwise specified should be sent using JSON encoding. Authentication: DM SoTech Lon to get a master application..." />
+<meta property="og:image" content="https://docs.taubot.qzz.io/_static/logo.png" />
 <meta property="og:image:alt" content="Taubot V2 Documentation" />
-<meta name="description" content="Taubot exposes a HTTPS API available at https://tau.work.gd/api/. All data unless otherwise specified should be sent using JSON encoding. Authentication: DM SoTech Lon to get a master application k..." />
+<meta name="description" content="Taubot exposes a HTTPS API available at https://taubot.qzz.io/api/. All data unless otherwise specified should be sent using JSON encoding. Authentication: DM SoTech Lon to get a master application..." />
 <meta property="og:ignore_canonical" content="true" />
 <meta name="theme-color" content="#e8cc4c" />
 
@@ -317,7 +317,7 @@
                   
   <section id="api">
 <h1>API<a class="headerlink" href="#api" title="Link to this heading">#</a></h1>
-<p>Taubot exposes a HTTPS API available at <a class="reference external" href="https://tau.work.gd/api/">https://tau.work.gd/api/</a>.</p>
+<p>Taubot exposes a HTTPS API available at <a class="reference external" href="https://taubot.qzz.io/api/">https://taubot.qzz.io/api/</a>.</p>
 <p>All data unless otherwise specified should be sent using JSON encoding.</p>
 <section id="authentication">
 <h2>Authentication<a class="headerlink" href="#authentication" title="Link to this heading">#</a></h2>
@@ -371,14 +371,14 @@ containing a UUID used to identify this particular flow.</p>
 
 <span class="k">def</span><span class="w"> </span><span class="nf">get_auth_link</span><span class="p">(</span><span class="n">ref_id</span><span class="p">:</span> <span class="n">UUID</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
     <span class="n">resp</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span>
-         <span class="s2">&quot;https://qwrky.dev/api/oauth-references&quot;</span><span class="p">,</span>
+         <span class="s2">&quot;https://taubot.qzz.io/api/oauth-references&quot;</span><span class="p">,</span>
          <span class="n">data</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;ref_id&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">ref_id</span><span class="p">)},</span>
          <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="n">master_key</span><span class="p">}</span>
     <span class="p">)</span>
     <span class="n">resp</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
 
     <span class="c1"># since uuids are urlsafe this is fine</span>
-    <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;https://qwrky.dev/api/oauth/grant?ref=</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">ref_id</span><span class="p">)</span><span class="si">}</span><span class="s2">&amp;aid=</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">application_id</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;https://taubot.qzz.io/api/oauth/grant?ref=</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">ref_id</span><span class="p">)</span><span class="si">}</span><span class="s2">&amp;aid=</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">application_id</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
 </pre></div>
 </div>
 <p>Once the user has completed the grant process, they should inform the application somehow so that the application can then retrieve their token.</p>
@@ -400,7 +400,7 @@ containing a UUID used to identify this particular flow.</p>
 <span class="k">def</span><span class="w"> </span><span class="nf">retrieve_key</span><span class="p">(</span><span class="n">ref_id</span><span class="p">:</span> <span class="n">UUID</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
    <span class="c1"># since UUIDs are urlsafe this is fine</span>
    <span class="n">resp</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-        <span class="sa">f</span><span class="s2">&quot;https://qwrky.dev/api/retrieve-key/</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">ref_id</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="sa">f</span><span class="s2">&quot;https://taubot.qzz.io/api/retrieve-key/</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">ref_id</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
         <span class="n">headers</span> <span class="o">=</span> <span class="p">{}</span>
    <span class="p">)</span>
    <span class="n">resp</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
@@ -415,10 +415,50 @@ containing a UUID used to identify this particular flow.</p>
 <h2>API Reference<a class="headerlink" href="#api-reference" title="Link to this heading">#</a></h2>
 <section id="response-types">
 <h3>Response Types<a class="headerlink" href="#response-types" title="Link to this heading">#</a></h3>
+<section id="application">
+<h4>Application<a class="headerlink" href="#application" title="Link to this heading">#</a></h4>
+<div class="pst-scrollable-table-container"><table class="table" id="id1">
+<caption><span class="caption-text">Application Response Structure</span><a class="headerlink" href="#id1" title="Link to this table">#</a></caption>
+<colgroup>
+<col style="width: 22.2%" />
+<col style="width: 22.2%" />
+<col style="width: 55.6%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head stub"><p>Key</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><th class="stub"><p>id</p></th>
+<td><p>String</p></td>
+<td><p>The application’s UUID encoded as a string</p></td>
+</tr>
+<tr class="row-odd"><th class="stub"><p>application_name</p></th>
+<td><p>String</p></td>
+<td><p>The name of the application</p></td>
+</tr>
+<tr class="row-even"><th class="stub"><p>economy_name</p></th>
+<td><p>String</p></td>
+<td><p>The name of the currency of the application’s economy</p></td>
+</tr>
+<tr class="row-odd"><th class="stub"><p>economy_id</p></th>
+<td><p>String</p></td>
+<td><p>The application economy’s UUID encoded as a stringy</p></td>
+</tr>
+<tr class="row-even"><th class="stub"><p>owner_id</p></th>
+<td><p>String</p></td>
+<td><p>The owner’s discord id encoded as a string since some programming languages can mess up ints that big</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
 <section id="account">
 <h4>Account<a class="headerlink" href="#account" title="Link to this heading">#</a></h4>
-<div class="pst-scrollable-table-container"><table class="table" id="id1">
-<caption><span class="caption-text">Account Response Structure</span><a class="headerlink" href="#id1" title="Link to this table">#</a></caption>
+<div class="pst-scrollable-table-container"><table class="table" id="id2">
+<caption><span class="caption-text">Account Response Structure</span><a class="headerlink" href="#id2" title="Link to this table">#</a></caption>
 <colgroup>
 <col style="width: 22.2%" />
 <col style="width: 22.2%" />
@@ -457,8 +497,8 @@ containing a UUID used to identify this particular flow.</p>
 </section>
 <section id="account-type">
 <h4>Account Type<a class="headerlink" href="#account-type" title="Link to this heading">#</a></h4>
-<div class="pst-scrollable-table-container"><table class="table" id="id2">
-<caption><span class="caption-text">Account Type</span><a class="headerlink" href="#id2" title="Link to this table">#</a></caption>
+<div class="pst-scrollable-table-container"><table class="table" id="id3">
+<caption><span class="caption-text">Account Type</span><a class="headerlink" href="#id3" title="Link to this table">#</a></caption>
 <colgroup>
 <col style="width: 28.6%" />
 <col style="width: 71.4%" />
@@ -487,8 +527,8 @@ containing a UUID used to identify this particular flow.</p>
 </section>
 <section id="transaction">
 <h4>Transaction<a class="headerlink" href="#transaction" title="Link to this heading">#</a></h4>
-<div class="pst-scrollable-table-container"><table class="table" id="id3">
-<caption><span class="caption-text">Transaction</span><a class="headerlink" href="#id3" title="Link to this table">#</a></caption>
+<div class="pst-scrollable-table-container"><table class="table" id="id4">
+<caption><span class="caption-text">Transaction</span><a class="headerlink" href="#id4" title="Link to this table">#</a></caption>
 <colgroup>
 <col style="width: 22.2%" />
 <col style="width: 22.2%" />
@@ -529,6 +569,19 @@ containing a UUID used to identify this particular flow.</p>
 <section id="endpoints">
 <h3>Endpoints<a class="headerlink" href="#endpoints" title="Link to this heading">#</a></h3>
 <p>Here’s an overview of all the requests you can currently make to the API.</p>
+<dl class="http get">
+<dt class="sig sig-object http" id="get--api-applications-me">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/api/applications/me</span></span><a class="headerlink" href="#get--api-applications-me" title="Link to this definition">#</a></dt>
+<dd><p>Returns information about the current application.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Status Codes<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1">200 OK</a></span> – Returns an Application object</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
 <dl class="http get">
 <dt class="sig sig-object http" id="get--api-users-(int-user_id)">
 <span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/api/users/</span></span><span class="sig-paren">(</span><em class="property"><span class="pre">int:</span> </em><em class="sig-param"><span class="pre">user_id</span></em><span class="sig-paren">)</span><a class="headerlink" href="#get--api-users-(int-user_id)" title="Link to this definition">#</a></dt>
@@ -663,6 +716,7 @@ containing a UUID used to identify this particular flow.</p>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#api-reference">API Reference</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#response-types">Response Types</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#application">Application</a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#account">Account</a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#account-type">Account Type</a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#transaction">Transaction</a></li>

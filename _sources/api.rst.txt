@@ -2,7 +2,7 @@
 API
 ===
 
-Taubot exposes a HTTPS API available at https://tau.work.gd/api/.
+Taubot exposes a HTTPS API available at https://taubot.qzz.io/api/.
 
 All data unless otherwise specified should be sent using JSON encoding.
 
@@ -71,14 +71,14 @@ Afterwards, a URL should be sent to the user granting the application permission
 
    def get_auth_link(ref_id: UUID) -> str:
        resp = requests.post(
-            "https://qwrky.dev/api/oauth-references",
+            "https://taubot.qzz.io/api/oauth-references",
             data={"ref_id": str(ref_id)},
             headers={"Authorization": master_key}
        )
        resp.raise_for_status()
 
        # since uuids are urlsafe this is fine
-       return f"https://qwrky.dev/api/oauth/grant?ref={str(ref_id)}&aid={str(application_id)}"
+       return f"https://taubot.qzz.io/api/oauth/grant?ref={str(ref_id)}&aid={str(application_id)}"
 
 
 Once the user has completed the grant process, they should inform the application somehow so that the application can then retrieve their token.
@@ -109,7 +109,7 @@ This key will have the same permissions the user set.
    def retrieve_key(ref_id: UUID) -> str:
       # since UUIDs are urlsafe this is fine
       resp = requests.get(
-           f"https://qwrky.dev/api/retrieve-key/{str(ref_id)}",
+           f"https://taubot.qzz.io/api/retrieve-key/{str(ref_id)}",
            headers = {}
       )
       resp.raise_for_status()
@@ -125,6 +125,33 @@ API Reference
 
 Response Types
 ^^^^^^^^^^^^^^
+
+Application
+~~~~~~~~~~~
+
+.. list-table:: Application Response Structure
+   :widths: 20 20 50
+   :header-rows: 1
+   :stub-columns: 1
+
+   * - Key
+     - Type
+     - Description
+   * - id
+     - String
+     - The application's UUID encoded as a string
+   * - application_name
+     - String
+     - The name of the application
+   * - economy_name
+     - String
+     - The name of the currency of the application's economy
+   * - economy_id
+     - String
+     - The application economy's UUID encoded as a stringy
+   * - owner_id
+     - String
+     - The owner's discord id encoded as a string since some programming languages can mess up ints that big
 
 Account
 ~~~~~~~
@@ -205,8 +232,13 @@ Transaction
 Endpoints
 ^^^^^^^^^
 
-
 Here's an overview of all the requests you can currently make to the API.
+
+.. http:get:: /api/applications/me
+
+   Returns information about the current application.
+
+   :statuscode 200: Returns an Application object
 
 .. http:get:: /api/users/(int:user_id)
 
@@ -214,7 +246,6 @@ Here's an overview of all the requests you can currently make to the API.
 
    :statuscode 200: Returns an Account object
    :statuscode 404: A personal account registered to that user could not be found.
-
 
 .. http:get:: /api/accounts/by-name/(str:account_name)
    
@@ -239,7 +270,6 @@ Here's an overview of all the requests you can currently make to the API.
    :statuscode 200: Returns a JSON list of Transaction objects
    :statuscode 404: The account specified could not be found
    :statuscode 401: You do not have the necessary permissions (:code:`VIEW_BALANCE`) to view the transaction log
-
 
 .. http:post:: /api/transactions/
    
