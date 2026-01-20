@@ -1,18 +1,17 @@
-from enum import Enum
-
+import traceback
 import aiohttp, asyncio
 import discord.errors
+import cProfile
+import pstats
 from aiohttp import web
 import jwt
 import os
-import time
 import re
 from uuid import UUID
 
 from aiohttp.web_request import Request
-from aiohttp.web_urldispatcher import SystemRoute
 
-from backend import StubUser, Permissions, Account, BackendError
+from backend import StubUser, Permissions, Account, BackendException
 from backend import Backend, Transaction, Application, KeyType, APIKey
 from backend import CONSOLE_USER_ID
 from utils import load_config
@@ -29,15 +28,14 @@ config = {}
 API_URL = "https://discord.com/api/v10"
 CALLBACK_URL = API_URL + "/oauth2/token"
 
-
 trusted_public_keys = {}
 private_key = None
 routes = web.RouteTableDef()
 INSECURE = (
     re.compile('^/api/oauth/'),
+    re.compile('^/static/'),
 )
-backend: Backend = None
-
+backend: Backend
 
 class APIStubUser(StubUser):
     @classmethod
@@ -45,7 +43,6 @@ class APIStubUser(StubUser):
         self = cls(key.key_id)
         self.mention = f"<@{key.issuer_id}>"
         return self
-
 
 def generate_key(key_id):
     if key_id == CONSOLE_USER_ID:
@@ -56,14 +53,12 @@ def generate_key(key_id):
     }
     return jwt.encode(claims, private_key, algorithm="RS512")
 
-
 async def get_actor(actor_id, economy):
     try:
         actor = await backend.get_member(actor_id, economy.owner_guild_id)
     except discord.errors.NotFound:
         actor = StubUser(actor_id)
     return actor
-
 
 def needs_discord(coro):
     async def result(request: Request, **kwargs):
@@ -77,7 +72,6 @@ def needs_discord(coro):
         )
     return result
 
-
 def needs(*types: KeyType):
     def decorator(coro):
         async def result(request: Request, key: APIKey = None, **kwargs):
@@ -87,22 +81,24 @@ def needs(*types: KeyType):
         return result
     return decorator
 
-
 @web.middleware
 async def authenticate(request, handler):
     rel_url = request.rel_url
-    print(rel_url)
+
     if [regex.match(str(rel_url)) for regex in INSECURE] != [None] * len(INSECURE):
         return await handler(request)
+    
     try:
         token = request.headers["authorization"]
     except KeyError:
         raise web.HTTPUnauthorized()
+    
     claims = jwt.decode(token, options={"verify_signature": False})
     public_key = trusted_public_keys[claims['iss'] + '.pub']
     options = {
         "require": ["kid", "iss"]
     }
+    
     try:
         claims = jwt.decode(token, public_key, algorithms=["RS512"], options=options)
     except:
@@ -118,9 +114,11 @@ async def authenticate(request, handler):
         raise web.HTTPUnauthorized()
     try:
         return await handler(request, key=key)
-    except TypeError:
-        raise web.HTTPNotFound() # Feeling a bit lazy iwl - this is technically pythonic tho
-
+    except web.HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exception(type(e), e, e.__traceback__)
+        raise web.HTTPInternalServerError()
 
 @routes.post('/api/oauth-references')
 @needs(KeyType.MASTER)
@@ -138,7 +136,6 @@ async def create_reference(request: Request, key: APIKey):
     auth_cache[key.application_id][ref_id] = {}
     return web.HTTPCreated()
 
-
 @routes.get('/api/retrieve-key/{ref_id}')
 @needs(KeyType.MASTER)
 async def retrieve_key(request, key: APIKey=None):
@@ -152,7 +149,6 @@ async def retrieve_key(request, key: APIKey=None):
     existing_key = backend.get_key(app, ref_id)
     if to_be_issued is None:
         to_be_issued = {}
-
 
     key_meta = to_be_issued.get(ref_id)
     if key_meta is None and existing_key is not None:
@@ -173,8 +169,8 @@ async def retrieve_key(request, key: APIKey=None):
                 *[Permissions[p] for p in perms[str(acc.account_id)]],
                 account=acc
             )
+        
         auth_cache[app.application_id].pop(ref_id)
-
 
     res = {
         "key": generate_key(key.key_id)
@@ -182,33 +178,33 @@ async def retrieve_key(request, key: APIKey=None):
 
     return web.json_response(res)
 
-
 @routes.get('/api/oauth/grant')
 async def start_linking(request):
-    oauth = config.get("oauth")
-    if oauth is None:
-        raise web.HTTPNotFound()
-    redirect_url = oauth.get("redirect_url")
-    if redirect_url is None:
-        raise web.HTTPNotFound()
-    resp = web.HTTPSeeOther(redirect_url)
-
     try:
-        reference_id = UUID(request.query.get('ref'))   # allow consumers of an API to set a reference code unique to the application when the user grants the token so they can later call taubot asking for it
-                                                        # It is the responsibility of API consumers to ensure their reference codes do not clash.
-                                                        # TODO: allow API consumer to specify minimum required scopes - i.e. don't bother granting the token unless I can at least do this
-        application_id = UUID(request.query.get('aid'))
-        app = backend.get_application(application_id)
-        if app is None:
+        oauth = config.get("oauth")
+        if oauth is None:
+            raise web.HTTPNotFound()
+        redirect_url = oauth.get("redirect_url")
+        if redirect_url is None:
+            raise web.HTTPNotFound()
+        resp = web.HTTPSeeOther(redirect_url)
+
+        try:
+            reference_id = UUID(request.query.get('ref'))   # allow consumers of an API to set a reference code unique to the application when the user grants the token so they can later call taubot asking for it
+                                                            # It is the responsibility of API consumers to ensure their reference codes do not clash.
+                                                            # TODO: allow API consumer to specify minimum required scopes - i.e. don't bother granting the token unless I can at least do this
+            application_id = UUID(request.query.get('aid'))
+            app = backend.get_application(application_id)
+            if app is None:
+                raise web.HTTPBadRequest()
+        except (ValueError, TypeError):
             raise web.HTTPBadRequest()
-    except (ValueError, TypeError):
-        raise web.HTTPBadRequest()
 
-
-
-    resp.set_cookie('aid', str(application_id))
-    resp.set_cookie('ref_code', str(reference_id))
-    return resp
+        resp.set_cookie('aid', str(application_id))
+        resp.set_cookie('ref_code', str(reference_id))
+        return resp
+    except Exception as error:
+        traceback.print_exception(type(error), error, error.__traceback__)
 
 async def get_access_token(code: str) -> str:
     oauth = config.get("oauth")
@@ -231,7 +227,6 @@ async def get_access_token(code: str) -> str:
     
     return data.get('access_token')
 
-
 async def get_user_id(token: str) -> int:
     async with aiohttp.ClientSession() as session:
         async with session.get(API_URL + '/users/@me', headers={'Authorization': 'Bearer ' + token}) as resp:
@@ -239,7 +234,6 @@ async def get_user_id(token: str) -> int:
                 raise web.HTTPBadRequest()
             user_id = int((await resp.json()).get('id'))
     return user_id
-
 
 @routes.get('/api/oauth/oauth-callback')
 async def start_linking(request: web.Request):
@@ -251,7 +245,6 @@ async def start_linking(request: web.Request):
     r = web.HTTPFound('/api/oauth/protected/grant')
     r.set_cookie('token', token)
     return r
-
 
 @routes.post('/api/oauth/issue')
 @needs_discord
@@ -316,9 +309,6 @@ async def issue_token(request, discord_id=None):
     }
     return web.HTTPCreated()
 
-
-
-
 @routes.get('/api/oauth/protected/grant')
 @needs_discord
 async def grant_page(request, discord_id=None):
@@ -346,11 +336,12 @@ async def grant_page(request, discord_id=None):
     result = env.get_template('grant_page.html').render(issuer=auth_granter, app=app, accounts=accs, has_perm=has_perm)
     return web.Response(text=result, content_type='text/html')
 
-
-
 @routes.get('/api/users/{user_id}')
 @needs(KeyType.GRANT, KeyType.MASTER)
 async def get_account_id(request, key: APIKey=None):
+    profile = cProfile.Profile()
+    
+    profile.enable()
     try:
         user_id = request.match_info["user_id"]
         user_id = key.issuer_id if user_id == "me" else int(user_id)
@@ -361,6 +352,11 @@ async def get_account_id(request, key: APIKey=None):
     account = backend.get_user_account(user_id, economy)
     if account is None:
         raise web.HTTPNotFound()
+    profile.disable()
+
+    ps = pstats.Stats(profile).sort_stats(pstats.SortKey.PCALLS)
+    ps.print_callers("isinstance")
+
     return web.json_response(await encode_account(key, account))
 
 async def encode_account(key:APIKey, account: Account):
@@ -371,7 +367,6 @@ async def encode_account(key:APIKey, account: Account):
         "account_type": account.account_type.name,
         "balance": account.balance if await backend.key_has_permission(key, Permissions.VIEW_BALANCE, account=account) else None
     }
-
 
 @routes.get("/api/accounts/by-name/{account_name}")
 @needs(KeyType.GRANT, KeyType.MASTER)
@@ -386,7 +381,6 @@ async def get_account_by_name(request, key: APIKey=None):
         raise web.HTTPNotFound()
     return web.json_response(await encode_account(key, account))
 
-
 @routes.get("/api/accounts/{account_id}")
 @needs(KeyType.GRANT)
 async def get_account(request, key: APIKey=None):
@@ -399,7 +393,6 @@ async def get_account(request, key: APIKey=None):
         raise web.HTTPNotFound()
 
     return web.json_response(await encode_account(key, account))
-
 
 def encode_transaction(t: Transaction):
     """
@@ -436,7 +429,8 @@ async def get_account_transactions(request, key: APIKey = None):
     return web.json_response(result)
 
 @routes.post("/api/transactions/")
-async def create_transaction(request, key: APIKey=None):
+@needs(KeyType.GRANT, KeyType.MASTER)
+async def create_transaction(request, key: APIKey = None):
     transaction_data = await request.json()
     if set(transaction_data.keys()) != {"from_account", "to_account", "amount"}:
         raise web.HTTPBadRequest()
@@ -454,14 +448,143 @@ async def create_transaction(request, key: APIKey=None):
         if await backend.key_has_permission(key, Permissions.TRANSFER_FUNDS, account=from_account):
             key.spent_to_date += amount
             backend.perform_transaction(actor, from_account, to_account, amount)
-    except BackendError:
+    except BackendException:
         raise web.HTTPBadRequest()
     return web.HTTPOk()
 
+def encode_application(application: Application):
+    return {
+        "application_id": str(application.application_id),
+        "application_name": application.application_name,
+        "economy_name": application.economy.currency_name,
+        "economy_id": str(application.economy_id),
+        "owner_id": application.owner_id
+    }
 
-def init_app():
-    global config, trusted_public_keys, private_key
+def encode_key(key: APIKey):
+    return {
+        "id": str(key.key_id),
+        "application_id": str(key.application_id),
+        "type": "master" if key.type == KeyType.MASTER else "grant",
+        "enabled": key.enabled
+    }
 
+@routes.get("/api/applications/me")
+async def get_self_application(request, key: APIKey = None):
+    application = key.application
+    return web.json_response(encode_application(application))
+
+@routes.get("/api/applications/user/{user_id}")
+async def get_user_application(request, key: APIKey = None):
+    try:
+        user_id = request.match_info["user_id"]
+    except KeyError:
+        raise web.HTTPNotFound()
+
+    if not await backend.key_has_permission(key, Permissions.MANAGE_ECONOMIES, economy=key.application.economy):
+        raise web.HTTPUnauthorized()
+
+    applications = backend.get_user_applications(user_id)
+    return web.json_response([encode_application(application) for application in applications])
+
+@routes.post("/api/applications/create")
+async def create_application(request, key: APIKey = None):
+    application_data = await request.json()
+    if set(application_data.keys()) != {"name", "owner_id", "economy_id"}:
+        raise web.HTTPBadRequest()
+
+    actor = APIStubUser.from_key(key)
+
+    try:
+        economy = backend.get_economy_by_id(UUID(application_data["economy_id"]))
+    except ValueError:
+        raise web.HTTPBadRequest()
+    if not economy: 
+        raise web.HTTPBadRequest()
+
+    if not await backend.key_has_permission(key, Permissions.MANAGE_ECONOMIES, economy=key.application.economy):
+        raise web.HTTPUnauthorized()
+
+    app = backend.create_application(actor, application_data["name"], application_data["owner_id"], economy)
+    return web.json_response(encode_application(app))
+
+@routes.get("/api/applications/{application_id}")
+async def get_application(request, key: APIKey = None):
+    try:
+        application_id = UUID(request.match_info["application_id"])
+    except (KeyError, ValueError):
+        raise web.HTTPNotFound()
+
+    app = backend.get_application(application_id)
+    if not app:
+        raise web.HTTPBadRequest()
+
+    if not await backend.key_has_permission(key, Permissions.MANAGE_ECONOMIES, economy=key.application.economy):
+        raise web.HTTPUnauthorized()
+
+    return web.json_response(encode_application(app))
+
+@routes.get("/api/applications/{application_id}/keys")
+async def get_keys(request, key: APIKey = None):
+    try:
+        application_id = UUID(request.match_info["application_id"])
+    except (KeyError, ValueError):
+        raise web.HTTPNotFound()
+
+    app = backend.get_application(application_id)
+    if not app:
+        raise web.HTTPBadRequest()
+
+    if not await backend.key_has_permission(key, Permissions.MANAGE_ECONOMIES, economy=key.application.economy):
+        raise web.HTTPUnauthorized()
+
+    keys = backend.get_application_keys(app)
+    return web.json_response([encode_key(key) for key in keys])
+
+@routes.post("/api/keys/disable")
+async def disable_key(request, key: APIKey = None):
+    key_data = await request.json()
+    if set(key_data.keys()) != {"key_id"}:
+        raise web.HTTPBadRequest()
+    try:
+        key_id = int(key_data["key_id"])
+    except ValueError:
+        raise web.HTTPBadRequest()
+
+    fetched_key = backend.get_key_by_id(key_id)
+    if not fetched_key:
+        raise web.HTTPBadRequest()
+
+    if not await backend.key_has_permission(key, Permissions.MANAGE_ECONOMIES, economy=key.application.economy):
+        raise web.HTTPUnauthorized()
+
+    fetched_key.enabled = False
+    return web.HTTPOk()
+
+@routes.post("/api/keys/enable")
+async def enable_key(request, key: APIKey = None):
+    key_data = await request.json()
+    if set(key_data.keys()) != {"key_id"}:
+        raise web.HTTPBadRequest()
+    try:
+        key_id = int(key_data["key_id"])
+    except ValueError:
+        raise web.HTTPBadRequest()
+
+    fetched_key = backend.get_key_by_id(key_id)
+    if not fetched_key:
+        raise web.HTTPBadRequest()
+
+    if not await backend.key_has_permission(key, Permissions.MANAGE_ECONOMIES, economy=key.application.economy):
+        raise web.HTTPUnauthorized()
+
+    fetched_key.enabled = True
+    return web.HTTPOk()
+
+def init_app(bknd: Backend):
+    global config, trusted_public_keys, private_key, backend
+
+    backend = bknd
     trusted_pubk_fps = os.listdir('./keys/public-keys/')
     private_key = open('./keys/jwt-key', 'rb').read()
     for fp in trusted_pubk_fps:
@@ -470,20 +593,14 @@ def init_app():
     env.globals['static_uri'] = config.get('static_uri')
     app = web.Application(middlewares=[authenticate])
     app.add_routes(routes)
-
+    app.add_routes([web.static('/static', "./static/")])
     return app
 
-async def main():
+async def main(bknd: Backend):
     global backend
-    runner = web.AppRunner(init_app())
-    db_uri = config.get('database_uri')
-    backend = Backend(db_uri if db_uri else 'sqlite:///database.db')
+
+    runner = web.AppRunner(init_app(bknd))
+    backend = bknd
     await runner.setup()
     site = web.TCPSite(runner, 'localhost', 8080)
     await site.start()
-
-if __name__ == '__main__':
-    print('starting API')
-    asyncio.set_event_loop(asyncio.new_event_loop())
-    asyncio.get_event_loop().create_task(main())
-    asyncio.get_event_loop().run_forever()
