@@ -1,1144 +1,1880 @@
-from io import StringIO
-import logging
-import time
-import csv
+from sqlalchemy import INT, JSON, AsyncAdaptedQueuePool, BigInteger, DateTime, ForeignKey, String, delete, or_, and_, select, update, case
+from sqlalchemy.orm import DeclarativeBase, Mapped, joinedload, load_only, mapped_column, relationship, selectinload
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from datetime import datetime
-from enum import Enum
-from typing import Any
-from typing import List
-from typing import Optional
+from enum import IntEnum
+from typing import Any, Optional, List, Protocol, Sequence, runtime_checkable, cast
 from uuid import UUID, uuid4
-
-from discord import Member, User  # I wanted to avoid doing this here, gonna have to rewrite all the unittests.
-from sqlalchemy import ForeignKey, INT, inspect, union, or_, Delete
-from sqlalchemy import String, BigInteger, DateTime, \
-    JSON  # I wanted to avoid using the JSON type since it locks us into certain databases, but on further research it seems to be supported by most major db distributions, and having unstructured data at times is sometimes just way too useful.
-from sqlalchemy import create_engine
-from sqlalchemy import func
-from sqlalchemy import select, delete, update
-from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy.orm import Mapped
-from sqlalchemy.orm import Session
-from sqlalchemy.orm import mapped_column
-from sqlalchemy.orm import relationship
+import discord
+import logging
+import asyncio
+import time
 
 logger = logging.getLogger(__name__)
 
-PRIVATE_LOG = 51
-PUBLIC_LOG = 52 # I'm picking these numbers so they do not clash with any others and if needs be we can add more
-
+class LogLevels(IntEnum):
+	"""
+	:meta private:
+	"""
+	Private = 51
+	Public = 52
 
 def frmt(amount: int) -> str:
-    return f'{amount//100}.{amount%100:02}'
-
+	"""
+	Formats balance in cents into `xx.yy` format.
+	
+	:param amount: The amount in cents.
+	
+	:returns: Balance in `xx.yy` format.
+	"""
+	return f"{amount // 100}.{amount % 100:02}"
 
 class Base(DeclarativeBase):
-    type_annotation_map= {
-        dict[str, Any]: JSON
-    }
+	type_annotation_map = {
+		dict[str, Any]: JSON
+	}
 
+# ========== IntEnums ==========
 
-class AccountType(Enum):
-    """Enum used to represent the different possible account types"""
-    USER = 0
-    GOVERNMENT = 1
-    CORPORATION = 2
-    CHARITY = 3
-    
+class AccountType(IntEnum):
+	"""Enum used to represent the different possible account types."""
+	USER = 0
+	GOVERNMENT = 1
+	CORPORATION = 2
+	CHARITY = 3
 
-class Permissions(Enum):
-    """An Enum that's used to represent different permissions"""
-    # Citizen
-    OPEN_ACCOUNT = 0
-    VIEW_BALANCE = 1
-    CLOSE_ACCOUNT = 2
-    TRANSFER_FUNDS = 3 
-    CREATE_RECCURRING_TRANSFER = 4
+class Permissions(IntEnum):
+	"""Enum used to represent the different permissions."""
+	# User
+	OPEN_ACCOUNT = 0
+	VIEW_BALANCE = 1
+	CLOSE_ACCOUNT = 2
+	TRANSFER_FUNDS = 3
+	CREATE_RECURRING_TRANSFERS = 4
 
-    # Admin/Developer
-    MANAGE_FUNDS = 5
-    
-    MANAGE_TAX_BRACKETS = 6
-    
-    MANAGE_PERMISSIONS = 7 # The scary one, users with this permission will be able to manage even permissions they do not hold.
-    MANAGE_ECONOMIES = 8
-    OPEN_SPECIAL_ACCOUNT = 9
+	# Guild administrator
+	MANAGE_FUNDS = 5
+	MANAGE_TAX_BRACKETS = 6
+	OPEN_SPECIAL_ACCOUNT = 9
+	LOGIN_AS_ACCOUNT = 10
+	GOVERNMENT_OFFICIAL = 11
 
-    LOGIN_AS_ACCOUNT = 10
-    GOVERNMENT_OFFICIAL = 11
+	# Developer
+	MANAGE_PERMISSIONS = 7
+	MANAGE_ECONOMIES = 8
 
-    # attributes or some BS
-    USES_EPHEMERAL = 12
+	# Attributes
+	USES_EPHEMERAL = 12
 
+class TaxType(IntEnum):
+	"""Enum used to represent the different types of taxation methods."""
+	WEALTH = 0
+	INCOME = 1
+	VAT = 2
+	TRANSACTION = 3
 
-    
+class TransactionType(IntEnum):
+	"""Enum used to represent the different types of transactions."""
+	PERSONAL = 0
+	INCOME = 1
+	PURCHASE = 2
 
-CONSOLE_USER_ID = 0 # a user id for the console - if I ever decide to strap a CLI onto this thing that will be its user id, 0 is an impossible discord id to have so it works for our purposes  
+class Actions(IntEnum):
+	"""Enum used to represent the different potential actions."""
+	TRANSFER = 0
+	MANAGE_FUNDS = 1
+	UPDATE_PERMISSIONS = 2
+	UPDATE_TAX_BRACKETS = 3
+	UPDATE_ECONOMIES = 4
+	PERFORM_TAXES = 5
+	UPDATE_ACCOUNTS = 6
+
+class CUD(IntEnum):
+	"""Enum used to represent the type of action taken."""
+	CREATE = 0
+	UPDATE = 1
+	DELETE = 2
+
+class KeyType(IntEnum):
+	"""Enum used to represent the different types of API key."""
+	GRANT = 0
+	MASTER = 1
+
+# ========= Models ==========
+
+class Economy(Base):
+	"""A class used to represent an economy stored in the database."""
+	__tablename__ = "economies"
+
+	economy_id: Mapped[UUID] = mapped_column(primary_key=True)
+	owner_guild_id: Mapped[int] = mapped_column(BigInteger(), nullable=False, unique=True)
+	currency_name: Mapped[str] = mapped_column(String(32), unique=True)
+	currency_unit: Mapped[str] = mapped_column(String(32))
+
+	guilds: Mapped[List["Guild"]] = relationship(back_populates="economy")
+	accounts: Mapped[List["Account"]] = relationship(back_populates="economy")
+	applications: Mapped[List["Application"]] = relationship(back_populates="economy")
+
+class Guild(Base):
+	"""A class used to represent a guild's economy stored in the database."""
+	__tablename__ = "guilds"
+
+	# Ticking time bomb, in roughly fifteen years this"ll break if this is still around then I wish the dev all the best. 
+	# (doing something like this first should fix it tho: id = id if id < 2^63 else -(id&(2^63-1))
+	# It's not ideal but unless SQL now supports unsigned types it's the best your gonna get.
+	guild_id: Mapped[int] = mapped_column(BigInteger(), primary_key=True)
+	
+	economy_id = mapped_column(ForeignKey("economies.economy_id"))
+	economy: Mapped[Economy] = relationship(back_populates="guilds")
+
+class Application(Base):
+	"""A class used to represent an API application stored in the database."""
+	__tablename__ = "applications"
+
+	application_id: Mapped[UUID] = mapped_column(primary_key=True)
+	application_name: Mapped[str] = mapped_column(String(64))
+	owner_id: Mapped[int] = mapped_column(BigInteger())
+
+	economy_id = mapped_column(ForeignKey("economies.economy_id"))
+	api_keys: Mapped[List["APIKey"]] = relationship(back_populates="application")
+	economy: Mapped[Economy] = relationship(back_populates="applications")
+
+class APIKey(Base):
+	"""A class used to represent an API key stored in the database."""
+	__tablename__ = "api_keys"
+
+	# Using an integer datatype to ensure that the ID will not clash with any Discord snowflakes (any Discord ID created after 2015-1-1-0:0:1.024 should not clash)
+	# Ref: https://discord.com/developers/docs/reference#snowflakes
+	key_id: Mapped[int] = mapped_column(INT(), primary_key=True, autoincrement=True) 
+	application_id = mapped_column(ForeignKey("applications.application_id", ondelete="CASCADE"))
+	internal_app_id: Mapped[UUID] = mapped_column(nullable=True)
+	issuer_id: Mapped[int] = mapped_column(BigInteger(), nullable=False)
+
+	spending_limit: Mapped[int] = mapped_column(nullable=True)
+	spent_to_date: Mapped[int] = mapped_column(nullable=True, default=0)
+
+	type: Mapped[KeyType] = mapped_column(default=KeyType.GRANT)
+	enabled: Mapped[bool] = mapped_column(default=False)
+	application: Mapped[Application] = relationship(back_populates="api_keys")
+
+	def activate(self):
+		"""
+		Activates the API key.
+		"""
+		self.enabled = True
+
+class Account(Base):
+	"""A class used to represent an account stored in the database."""
+	__tablename__ = "accounts"
+
+	account_id: Mapped[UUID] = mapped_column(primary_key=True)
+	account_name: Mapped[str] = mapped_column(String(64))
+	owner_id: Mapped[int] = mapped_column(BigInteger(), nullable=True)
+
+	account_type: Mapped[AccountType] = mapped_column()
+	balance: Mapped[int] = mapped_column(default=0)
+	income_to_date: Mapped[int] = mapped_column(default=0)
+	economy_id = mapped_column(ForeignKey("economies.economy_id"))
+	deleted: Mapped[bool] = mapped_column(default=False)
+	
+	economy: Mapped[Economy] = relationship(back_populates="accounts")
+	update_notifiers: Mapped[List["BalanceUpdateNotifier"]] = relationship(back_populates="account")
+
+	def get_update_notifiers(self) -> List[int]:
+		"""
+		Returns the update notifiers of the account.
+		
+		:returns: A list of the user IDs of the update notifiers of the account.
+		"""
+		return [i.owner_id for i in self.update_notifiers] + [self.owner_id,]
+
+	def get_balance(self) -> str:
+		"""
+		Returns the balance formatted as a string.
+
+		This method should be used to avoid any weird floating point shenanigans when calculating the balance.
+		
+		:returns: The balance formatted as a string.
+		"""
+		return frmt(self.balance)
+
+	def get_name(self) -> str:
+		"""
+		Returns the name of the account.
+		
+		:returns: The name of the account.
+		"""
+		if self.account_type == AccountType.USER:
+			return f"<@{self.owner_id}>"
+		return self.account_name
+
+	def delete(self):
+		"""
+		Marks the account as deleted.
+		"""
+		self.deleted = True
+
+class Transaction(Base):
+	"""A class used to represent transactions stored in the database."""
+	__tablename__ = "transactions"
+
+	transaction_id: Mapped[int] = mapped_column(primary_key=True)
+	actor_id: Mapped[int] = mapped_column(BigInteger(), nullable=False)
+
+	timestamp: Mapped[datetime] = mapped_column(DateTime(), nullable=False, default=datetime.now)
+	action: Mapped[Actions] = mapped_column()
+
+	# Denotes the type of action taking place; can be either CREATE, UPDATE or DELETE
+	cud: Mapped[CUD] = mapped_column() 
+	economy_id: Mapped[UUID] = mapped_column(nullable=True)
+
+	# Transfers will use target_account as the source account for the transaction
+	target_account_id: Mapped[UUID] = mapped_column(ForeignKey("accounts.account_id"), nullable=True) 
+	destination_account_id: Mapped[UUID] = mapped_column(ForeignKey("accounts.account_id"), nullable=True)
+	amount: Mapped[int] = mapped_column(nullable=True)
+
+	# TODO: Let Stoner document this. 
+	meta: Mapped[dict[str, Any]] = mapped_column(default={}) 
+
+	destination_account: Mapped[Account] = relationship(foreign_keys=[destination_account_id])
+	target_account: Mapped[Account] = relationship(foreign_keys=[target_account_id])
+
+class BalanceUpdateNotifier(Base):
+	"""A class used to represent an account's balance update notifier stored in the database."""
+	__tablename__ = "balance_update_notifiers"
+	notifier_id: Mapped[UUID] = mapped_column(primary_key=True)
+	owner_id: Mapped[int] = mapped_column(BigInteger(), nullable=False)
+	account_id: Mapped[UUID] = mapped_column(ForeignKey("accounts.account_id", ondelete="CASCADE"))
+	account: Mapped[Account] = relationship(back_populates="update_notifiers")
+
+class Permission(Base):
+	"""A class used to represent a permission as stored in the database."""
+	__tablename__ = "perms"
+
+	entry_id: Mapped[UUID] = mapped_column(primary_key=True)
+	account_id: Mapped[UUID] = mapped_column(ForeignKey("accounts.account_id"), nullable=True)
+
+	# Can also be a role ID or an API key ID < 4194304, due to how Discord works there are zero chances of a collision.
+	user_id: Mapped[int] = mapped_column(BigInteger(), index=True) 
+	permission: Mapped[Permissions] = mapped_column()
+	allowed: Mapped[bool] = mapped_column()
+	economy_id: Mapped[UUID] = mapped_column(
+		ForeignKey("economies.economy_id", ondelete="CASCADE"), 
+		nullable=True, 
+		index=True 
+	)
+
+class Tax(Base):
+	"""A class used to represent a tax bracket stored in the database."""
+	__tablename__ = "taxes"
+
+	entry_id: Mapped[UUID] = mapped_column(primary_key=True)
+	tax_name: Mapped[str] = mapped_column(String(32))
+
+	affected_type: Mapped[AccountType] = mapped_column()
+	tax_type: Mapped[TaxType] = mapped_column()
+
+	bracket_start: Mapped[int] = mapped_column()
+	bracket_end: Mapped[int] = mapped_column(nullable=True)
+	rate: Mapped[int] = mapped_column()
+
+	to_account_id: Mapped[UUID] = mapped_column(ForeignKey("accounts.account_id"))
+	economy_id: Mapped[UUID] = mapped_column(ForeignKey("economies.economy_id"))
+
+	to_account: Mapped[Account] = relationship()
+	economy: Mapped[Economy] = relationship()
+
+class RecurringTransfer(Base):
+	"""A class used to represent a recurring transfer as stored in the database."""
+	__tablename__ = "recurring_transfers"
+	
+	entry_id: Mapped[UUID] = mapped_column(primary_key=True)
+	authorisor_id: Mapped[int] = mapped_column(BigInteger())
+
+	from_account_id: Mapped[UUID] = mapped_column(ForeignKey("accounts.account_id"))
+	from_account: Mapped[Account] = relationship(foreign_keys=from_account_id)
+
+	to_account_id: Mapped[UUID] = mapped_column(ForeignKey("accounts.account_id"))
+	to_account: Mapped[Account] = relationship(foreign_keys=to_account_id)
+
+	amount: Mapped[int] = mapped_column()
+	last_payment_timestamp: Mapped[float] = mapped_column()
+	payment_interval: Mapped[int] = mapped_column() # IN SECONDS
+
+	# Thanks hackerman :)
+	number_of_payments_left: Mapped[Optional[int]] = mapped_column(nullable=True) 
+
+	transaction_type: Mapped[TransactionType] = mapped_column()
+
+# ========== Utils ==========
+
+class BackendException(Exception):
+	"""The base exception for all backend errors."""
+	pass
+
+class UnauthorizedException(BackendException):
+	"""The backend exception raised when an actor is unauthorized to perform an action (does not have the permissions to perform said action)."""
+	pass
+
+class NotFoundException(BackendException):
+	"""The backend exception raised when an object is not found in the database."""
+	pass
+
+class AlreadyExistsException(BackendException):
+	"""The backend exception raised when an object in the database already has a similar field value."""
+	pass
+
+class ValueError(BackendException, ValueError):
+	pass
+
+class HasID(Protocol):
+	"""A protocol to define all objects with an ID field (users, stub users, roles, stub roles, members, etc.)."""
+	id: int
+
+@runtime_checkable
+class HasRoles(Protocol):
+	"""A protocol to define all member objects with a roles field (stub members and discord members)."""
+	id: int
+	roles: List[HasID]
+
+type User = HasID | HasRoles
+
+_get_roles = lambda u: [r.id for r in cast(HasRoles, u).roles] if isinstance(u, (HasRoles, discord.Member)) else []
+
+class StubUser:
+	"""
+	A class to be used if a user could not be found anymore.
+	This could be if the user or guild were deleted.
+	"""
+	
+	def __init__(self, user_id: int):
+		"""
+		:param user_id: The user's ID.
+		"""
+		self.id = user_id
+		self.mention = f"<@{user_id}>"
+		self.roles = []
+
+type Serialized = str | list[str | Serialized] | dict[str, str]
+def make_serializable(arg: Any) -> Serialized:
+	"""
+	Turns objects into serializable versions of themselves through string representations where necessary.
+	
+	:param arg: The object to make serializable.
+	
+	:returns: The serialized object.
+	"""
+	if isinstance(arg, UUID):
+		return str(arg)
+	elif isinstance(arg, IntEnum):
+		return arg.name
+	elif isinstance(arg, (tuple, list)):
+		return [make_serializable(i) for i in arg]
+	elif isinstance(arg, dict):
+		new_dict = {}
+		for k in arg.keys():
+			new_dict[k] = make_serializable(arg[k])
+		return new_dict
+	else:
+		return arg
+
+DAY_TO_SECOND = 86_400 # 24 hours * 60 minutes * 60 seconds
+
+# ======== Constants ========
+
+# a user id for the console - if I ever decide to strap a CLI onto this thing that will be its user id, 0 is an impossible discord id to have so it works for our purposes  
+CONSOLE_USER_ID = 0 
 
 DEFAULT_GLOBAL_PERMISSIONS = [
-    Permissions.OPEN_ACCOUNT
+	Permissions.OPEN_ACCOUNT
 ]
 
 DEFAULT_OWNER_PERMISSIONS = [
-    Permissions.CLOSE_ACCOUNT,
-    Permissions.TRANSFER_FUNDS,
-    Permissions.CREATE_RECCURRING_TRANSFER,
-    Permissions.VIEW_BALANCE,
-    Permissions.LOGIN_AS_ACCOUNT
+	Permissions.CLOSE_ACCOUNT,
+	Permissions.TRANSFER_FUNDS,
+	Permissions.CREATE_RECURRING_TRANSFERS,
+	Permissions.VIEW_BALANCE,
+	Permissions.LOGIN_AS_ACCOUNT
 ]
 
 UNPRIVILEGED_PERMISSIONS = [
-    Permissions.USES_EPHEMERAL,
-    Permissions.GOVERNMENT_OFFICIAL
+	Permissions.USES_EPHEMERAL,
+	Permissions.GOVERNMENT_OFFICIAL
 ]
 
-
-
-class TaxType(Enum):
-    """An Enum used to represent different types of taxes"""
-    WEALTH = 0
-    INCOME = 1
-    VAT = 2
-    TRANSACTION = 3
-
-class TransactionType(Enum):
-    """An Enum used to represent different types of transactions"""
-    PERSONAL = 0
-    INCOME = 1
-    PURCHASE = 2
-
-
-
-class Actions(Enum):
-    """An Enum to represent different potential actions"""
-    TRANSFER = 0
-    MANAGE_FUNDS = 1
-    UPDATE_PERMISSIONS = 2
-    UPDATE_TAX_BRACKETS = 3
-    UPDATE_ECONOMIES = 4
-    PERFORM_TAXES = 5
-    UPDATE_ACCOUNTS = 6
-
-    
-class CUD(Enum):
-    CREATE = 0
-    UPDATE = 1
-    DELETE = 2
-
-
-
-
-class Economy(Base):
-    """A class used to represent an economy stored in the database"""
-    __tablename__ = 'economies'
-    economy_id: Mapped[UUID]  = mapped_column(primary_key=True)
-#   tax_period: Mapped[int] = mapped_column(default=60*60*24*7)
-#   last_tax_timestamp: Mapped[int] = mapped_column()
-    owner_guild_id: Mapped[int] = mapped_column(BigInteger(), nullable=False)
-    currency_name: Mapped[str] = mapped_column(String(32), unique=True)
-    currency_unit: Mapped[str] = mapped_column(String(32))
-
-    guilds: Mapped[List["Guild"]] = relationship(back_populates="economy")
-    accounts: Mapped[List["Account"]] = relationship(back_populates="economy")
-    applications: Mapped[List["Application"]] = relationship(back_populates="economy")
-        
-
-
-class Guild(Base):
-    """A class used to represent a discord server stored in the database"""
-    __tablename__ = 'guilds'
-    guild_id: Mapped[int] = mapped_column(BigInteger(), primary_key=True) # Ticking time bomb, in roughly fifteen years this'll break if this is still around then I wish the dev all the best. 
-                                                                          # (doing something like this first should fix it tho: id = id if id < 2^63 else -(id&(2^63-1)) its not ideal but unless SQL now supports unsigned types its the best your gonna get )
-    economy_id = mapped_column(ForeignKey("economies.economy_id"))
-    
-    economy: Mapped[Economy] = relationship(back_populates="guilds")
-
-
-
-class MCDiscordMap(Base):
-    __tablename__ = 'mcdiscordlink'
-    user_id: Mapped[int] = mapped_column(BigInteger(), primary_key = True)
-    mc_token: Mapped[str] = mapped_column(String(22), primary_key = True)
-
-
-class Application(Base):
-    __tablename__ = 'applications'
-    application_id: Mapped[UUID] = mapped_column(primary_key=True)
-    application_name: Mapped[str] = mapped_column(String(64))
-    owner_id: Mapped[int] = mapped_column(BigInteger())
-    economy_id = mapped_column(ForeignKey("economies.economy_id"))
-    api_keys: Mapped[List["APIKey"]] = relationship(back_populates="application")
-    economy: Mapped[Economy] = relationship(back_populates="applications")
-
-
-class KeyType(Enum):
-    GRANT = 0 # To be used for user issued keys
-    MASTER = 1 # To be used for application master keys
-
-
-class APIKey(Base):
-    __tablename__ = 'api_keys'
-    key_id: Mapped[int] = mapped_column(INT(), primary_key=True, autoincrement=True) # using an int datatype to ensure that the id will not clash with any discord snowflakes (any discord id created after 2015-1-1-0:0:1.024 should not clash) https://discord.com/developers/docs/reference#snowflakes
-    application_id = mapped_column(ForeignKey("applications.application_id", ondelete='CASCADE'))
-    internal_app_id: Mapped[UUID] = mapped_column(nullable=True)
-    issuer_id: Mapped[int] = mapped_column(BigInteger(), nullable=False)
-    spending_limit: Mapped[int] = mapped_column(nullable=True)
-    spent_to_date: Mapped[int] = mapped_column(nullable=True, default=0)
-    type: Mapped[KeyType] = mapped_column(default=KeyType.GRANT)
-    enabled: Mapped[bool] = mapped_column(default=False)
-    application: Mapped[Application] = relationship(back_populates="api_keys")
-
-    def activate(self):
-        self.enabled = True
-
-class Account(Base):
-    """A class used to represent an account stored in the database"""
-    __tablename__ = 'accounts'
-    account_id: Mapped[UUID] = mapped_column(primary_key=True)
-    account_name: Mapped[str] = mapped_column(String(64))
-    owner_id: Mapped[int] = mapped_column(BigInteger(), nullable=True)
-    account_type: Mapped[AccountType] = mapped_column()
-    balance: Mapped[int] = mapped_column(default=0)
-    income_to_date: Mapped[int] = mapped_column(default=0)
-    economy_id = mapped_column(ForeignKey("economies.economy_id"))
-    deleted: Mapped[bool] = mapped_column(default=False)
-    
-    economy: Mapped[Economy] = relationship(back_populates="accounts")
-    update_notifiers: Mapped[List["BalanceUpdateNotifier"]] = relationship(back_populates='account')
-
-
-    def get_update_notifiers(self):
-        return [i.owner_id for i in self.update_notifiers] + [self.owner_id,]
-
-    def get_balance(self) -> str:
-        """This method should be used to avoid any weird floating point shenanigans when calculating the balance"""
-        return frmt(self.balance)
-
-    def get_name(self) -> str:
-        if self.account_type == AccountType.USER:
-            return f'<@{self.owner_id}>'
-        return self.account_name
-
-    def delete(self):
-        self.deleted = True
-
-
-
-class Transaction(Base):
-    """A class used to represent transactions stored in the database"""
-    __tablename__ = 'transactions'
-    transaction_id: Mapped[int] = mapped_column(primary_key=True)
-    actor_id: Mapped[int] = mapped_column(BigInteger(), nullable=False)
-    timestamp: Mapped[DateTime] = mapped_column(DateTime(), nullable=False, default=datetime.now)
-    action: Mapped[Actions] = mapped_column()
-    cud: Mapped[CUD] = mapped_column() # denotes the type of action taking place, can be either CREATE UPDATE or DELETE
-    economy_id: Mapped[UUID] = mapped_column(nullable=True)
-    target_account_id: Mapped[UUID] = mapped_column(ForeignKey("accounts.account_id"), nullable=True) # Transfers will use target_account as the source account for the transaction
-    destination_account_id: Mapped[UUID] = mapped_column(ForeignKey("accounts.account_id"), nullable=True)
-    amount: Mapped[int] = mapped_column(nullable=True)
-
-    meta: Mapped[dict[str, Any]] = mapped_column(default={}) # TODO: document this shit. 
-
-    destination_account: Mapped[Account] = relationship(foreign_keys=[destination_account_id])
-    target_account: Mapped[Account] = relationship(foreign_keys=[target_account_id])
-
-
-    
-
-    
-
-class BalanceUpdateNotifier(Base):
-    __tablename__ = 'balance_update_notifiers'
-    notifier_id: Mapped[UUID] = mapped_column(primary_key=True)
-    owner_id: Mapped[int] = mapped_column(BigInteger(), nullable=False)
-    account_id: Mapped[UUID] = mapped_column(ForeignKey("accounts.account_id", ondelete="CASCADE"))
-    account: Mapped[Account] = relationship(back_populates="update_notifiers")
-
-
-
-class Permission(Base):
-    """A class used to represent a permission as stored in the database"""
-    __tablename__ = 'perms'
-    entry_id: Mapped[UUID] = mapped_column(primary_key=True)
-    account_id: Mapped[UUID] = mapped_column(ForeignKey('accounts.account_id'), nullable=True)
-    user_id: Mapped[int] = mapped_column(BigInteger()) # can also be a role id or an api key id < 4194304, due to how discord works there are zero chances of a collision
-    permission: Mapped[Permissions] = mapped_column()
-    allowed: Mapped[bool] = mapped_column()
-    economy_id: Mapped[UUID] = mapped_column(ForeignKey("economies.economy_id", ondelete="CASCADE"), nullable=True)
-    
-    account: Mapped[Account] = relationship()
-    economy: Mapped[Economy] = relationship()
-
-
-class Tax(Base):
-    """A class used to represent a tax bracket stored in the database"""
-    __tablename__ = 'taxes'
-    entry_id: Mapped[UUID] = mapped_column(primary_key=True)
-    tax_name: Mapped[str] = mapped_column(String(32))
-    affected_type: Mapped[AccountType] = mapped_column()
-    tax_type: Mapped[TaxType] = mapped_column()
-    bracket_start: Mapped[int] = mapped_column()
-    bracket_end: Mapped[int] = mapped_column(nullable=True)
-    rate: Mapped[int] = mapped_column()
-    to_account_id: Mapped[UUID] = mapped_column(ForeignKey("accounts.account_id"))
-    economy_id: Mapped[UUID] = mapped_column(ForeignKey("economies.economy_id"))
-    to_account: Mapped[Account] = relationship()
-    economy: Mapped[Economy] = relationship()
-
-
-class RecurringTransfer(Base):
-    """A class used to represent a recurring transfer as stored in the database"""
-    __tablename__ = 'recurring_transfers'
-    entry_id: Mapped[UUID] = mapped_column(primary_key=True)
-    
-    authorisor_id: Mapped[int] = mapped_column(BigInteger())
-
-    from_account_id: Mapped[UUID] = mapped_column(ForeignKey("accounts.account_id"))
-    from_account: Mapped[Account] = relationship(foreign_keys=from_account_id)
-
-    to_account_id: Mapped[UUID] = mapped_column(ForeignKey("accounts.account_id"))
-    to_account: Mapped[Account] = relationship(foreign_keys=to_account_id)
-
-    amount: Mapped[int] = mapped_column()
-    last_payment_timestamp: Mapped[int] = mapped_column()
-    payment_interval: Mapped[int] = mapped_column()
-    number_of_payments_left: Mapped[int] = mapped_column(nullable=True) # thanks hackerman!
-
-    transaction_type: Mapped[TransactionType] = mapped_column()
-
-class BackendError(Exception):
-    pass
-
-
-class StubUser:
-    """
-    A class to be used if the user could not be found anymore
-    this could be if the user was deleted or if the guild was deleted
-    """
-    def __init__(self, user_id):
-        self.id = user_id
-        self.mention = f"<@{user_id}>"
-        self.roles = []
-
-
-def make_serializable(arg: Any):
-    if isinstance(arg, UUID):
-        return str(arg)
-    elif isinstance(arg, Enum):
-        return arg.name
-    elif isinstance(arg, (tuple, list)):
-        return [make_serializable(i) for i in arg]
-    elif isinstance(arg, dict):
-        new_dict = {}
-        for k in arg.keys():
-            new_dict[k] = make_serializable(arg[k])
-        return new_dict
-    else:
-        return arg
-
-
+# ========= Backend =========
 
 class Backend:
-    """A singleton used to call the backend database"""
-    
-    def __init__(self, path: str):
-        self.engine = create_engine(path)
-        self.session = Session(self.engine)
-        Base.metadata.create_all(self.engine)
-
-    def dump_accounts_csv(self, buf: StringIO):
-        out_csv = csv.writer(buf, lineterminator='\n')
-
-        columns = [column.name for column in inspect(Account).columns]
-        out_csv.writerow(columns)
-
-        extract_query = [getattr(Account, col) for col in columns]
-        for mov in self.session.query(*extract_query):
-            out_csv.writerow(mov)
-
-        buf.seek(0)
-        return buf
-
-    def dump_transactions_csv(self, buf: StringIO):
-        out_csv = csv.writer(buf, lineterminator='\n')
-
-        columns = [column.name for column in inspect(Transaction).columns]
-        out_csv.writerow(columns)
-
-        extract_query = [getattr(Transaction, col) for col in columns]
-        for mov in self.session.query(*extract_query):
-            out_csv.writerow(mov)
-
-        buf.seek(0)
-        return buf
-
-    async def tick(self):
-        """
-        Triggers a tick in the server
-        Must be triggered externally        
-        """
-
-        tick_time = time.time()
-        stmt = select(RecurringTransfer).where((RecurringTransfer.last_payment_timestamp + RecurringTransfer.payment_interval) <= tick_time)
-        transfers = self.session.execute(stmt).all()
-        for transfer in transfers:
-            transfer = transfer[0]
-            number_of_transfers = int((tick_time - transfer.last_payment_timestamp) // transfer.payment_interval)
-            payments_left = transfer.number_of_payments_left # I'm extracting this value since updating ORM objects is more expensive than updating an int and informing the ORM of the changes at the end.
-            for i in range(number_of_transfers):
-                if payments_left == 0:
-                    self.session.delete(transfer)
-                    break
-                
-                try:
-                    authorisor = await self.get_member(transfer.authorisor_id, transfer.from_account.economy.owner_guild_id)
-                    if authorisor is None:
-                        authorisor = StubUser(transfer.authorisor_id)
-                    self.perform_transaction(authorisor, transfer.from_account, transfer.to_account, transfer.amount, transfer.transaction_type)
-                    payments_left -= 1
-                except BackendError as e:
-                    logger.log(PRIVATE_LOG, f'Failed to perform recurring transaction of {frmt(transfer.amount)} from {transfer.from_account.account_name} to {transfer.to_account.account_name} due to : {e}')
-                    self.notify_user(transfer.authorisor_id, "Your recurring transaction of {frmt(transfer.amount)} every {transfer.payment_interval/60/60/24}days to {transfer.to_account.account_name} was cancelled due to: {e}", "Failed Reccurring Transfer")
-                    self.session.delete(transfer)
-            else: # for those unfamiliar with for/else this is not executed if the loop breaks
-                transfer.number_of_payments_left = payments_left
-                transfer.last_payment_timestamp = tick_time
-
-        self.session.commit()
-        
-        logger.log(PUBLIC_LOG, f'successfully performed tick')
-
-
-    def _one_or_none(self, stmt):
-        res = self.session.execute(stmt).one_or_none()
-        return res if res is None else res[0]
-
-
-    def get_permissions(self, user: Member, economy=None):
-        perms = select(Permission).where(Permission.user_id.in_([user.id] + [r.id for r in user.roles]))
-        if economy is not None:
-            perms.where(Permission.economy == economy)
-        return [i[0] for i in self.session.execute(perms).all()]
-
-    def get_authable_accounts(self, user: Member, economy=None):
-        stmt = (select(Account).distinct().join_from(Account, Permission, Account.account_id == Permission.account_id, isouter=True)
-                .where(or_(Permission.user_id.in_([user.id] + [r.id for r in user.roles]),  Account.owner_id == user.id)))
-        if economy is not None:
-            stmt = stmt.where(Account.economy_id == economy.economy_id)
-
-        return [i[0] for i in self.session.execute(stmt).all()]
-
-    async def key_has_permission(self, key: APIKey, *args, **kwargs) -> bool:
-        actor = await self.get_member(key.issuer_id, key.application.economy.owner_guild_id)
-        return self.has_permission(StubUser(key.key_id), *args, **kwargs) and self.has_permission(actor, *args, **kwargs)
-
-    def has_permission(self, user, permission: Permissions, account: Account = None, economy: Economy = None) -> bool:
-        """
-        Checks if a user is allowed to do something
-        """
-        if user.id == CONSOLE_USER_ID:
-            return True
-
-        if account is not None and economy is None:
-            economy = account.economy
-
-        stmt = select(Permission).where(Permission.user_id.in_([user.id] + [r.id for r in user.roles])).where(Permission.permission == permission)
-        stmt = stmt.where((Permission.account_id == (account.account_id if account is not None else None)) | (Permission.account_id == None))
-        stmt = stmt.where((Permission.economy_id == (economy.economy_id if economy is not None else None)) | (Permission.economy_id == None))
-        default = False
-        owner_id = account.owner_id if account is not None else None
-
-        if permission in DEFAULT_GLOBAL_PERMISSIONS:
-            default = True
-        elif permission in DEFAULT_OWNER_PERMISSIONS and owner_id in [user.id] + [r.id for r in user.roles]:
-            default = True
-        
-        
-        result = list(self.session.execute(stmt).all())
-        
-        if len(result) == 0:
-            return default
-
-
-        def evaluate(perm):
-            # Precedence for result : 
-            # 1. account & economy are null
-            # 2. account is null
-            # 3. account & economy are not null
-            # Economy cannot be null without account being null
-            if perm.account_id is None and perm.economy_id is None:
-                return 1
-            if perm.account_id is None:
-                return 2
-            return 3
-
-        best = result.pop(0)[0]
-        for r in result:
-            # Some more precedence rules
-            # permissions registered to the user directly take priority over those registered to roles
-            # and the higher the role in the discord ranking thing the higher the precedence
-            r = r[0]
-            if evaluate(best) > evaluate(r):
-                best = r
-                continue
-            if evaluate(best) == evaluate(r):
-                if best.user_id == user.id:
-                    continue
-                elif r.user_id == user.id:
-                    best = r
-                elif user.guild.get_role(best.user_id) < user.guild.get_role(r.user_id):
-                    best = r
-        
-        return best.allowed
-
-    """Discord Shit"""
-    def notify_user(self, user_id, message, title, thumbnail=None):
-        logger.warning("Backend failed to message user: {user_id}")
-
-    def notify_users(self, user_ids, *args, **kwargs):
-        for user_id in user_ids:
-            self.notify_user(user_id, *args, **kwargs)
-
-    async def get_member(self, user_id, guild_id):
-        raise NotImplementedError()
-
-    async def get_user_dms(self, user_id):
-        raise NotImplementedError()
-
-    def get_application(self, app_id):
-        return self._one_or_none(select(Application).where(Application.application_id == app_id))
-
-    def get_key(self, app: Application, ref_id: UUID) -> APIKey | None:
-        return self._one_or_none(select(APIKey).where(APIKey.application == app).where(APIKey.internal_app_id == ref_id))
-
-    def get_key_by_id(self, kid: int) -> APIKey | None:
-        return self._one_or_none(select(APIKey).where(APIKey.key_id == kid))
-
-    def initialize_key(self, app: Application, ref_id: UUID, issuer_id: int) -> APIKey:
-        current_key = self.get_key(app, ref_id)
-        if current_key is not None:
-            self.session.delete(current_key)
-
-        new_key = APIKey(application = app, internal_app_id=ref_id, issuer_id=issuer_id)
-        self.session.add(new_key)
-        return new_key
-
-
-
-    def get_discord_id(self, mc_token):
-        mc_ds_map = self._one_or_none(select(MCDiscordMap).where(MCDiscordMap.mc_token == mc_token))
-        if mc_ds_map:
-            return mc_ds_map.user_id
-        return None
-
-    def register_mc_token(self, user_id, mc_token):
-        if len(mc_token) != 22:
-            raise BackendError("Invalid mc token provided")
-
-        current_id = self.get_discord_id(mc_token)
-        if current_id is not None:
-            raise BackendError("This minecraft account is already linked with a user account, contact an admin if you believe this is in error")
-
-        current_map = self._one_or_none(select(MCDiscordMap).where(MCDiscordMap.user_id == user_id))
-        if current_map is not None:
-            self.session.delete(current_map)
-
-        new_map = MCDiscordMap(user_id = user_id, mc_token = mc_token)
-        self.session.add(new_map)
-        self.session.commit()
-
-
-    """Taxes"""
-
-
-    def get_tax_bracket(self, tax_name, economy):
-        return self._one_or_none(select(Tax).where(Tax.tax_name==tax_name).where(Tax.economy_id == economy.economy_id))
-
-
-    def get_tax_brackets(self, economy):
-        return self.session.execute(select(Tax).where(Tax.economy_id == economy.economy_id)).all()
-
-
-    def create_tax_bracket(self, user: Member, tax_name: str, affected_type: AccountType, tax_type: TaxType, bracket_start: int, bracket_end: int, rate: int, to_account: Account):
-        if not self.has_permission(user, Permissions.MANAGE_TAX_BRACKETS, economy=to_account.economy):
-            raise BackendError("You do not have permission to create tax brackets in this economy")
-
-        if self.get_tax_bracket(tax_name, to_account.economy) is not None:
-            raise BackendError("A tax bracket of that name already exists in this economy")
-
-        kwargs = {
-            "entry_id": uuid4(),
-            "tax_name": tax_name,
-            "affected_type": affected_type,
-            "tax_type": tax_type,
-            "bracket_start": bracket_start,
-            "bracket_end": bracket_end,
-            "rate": rate,
-            "to_account_id": to_account.account_id,
-            "economy_id": to_account.economy.economy_id
-        }
-        tax_bracket = Tax(**kwargs)
-        self.session.add(tax_bracket)
-        logger.log(PUBLIC_LOG, f"Economy: {to_account.economy.currency_name}\n{user.mention} created a new tax bracket by the name {tax_name}")
-
-
-        
-    
-
-        self.session.add(Transaction(
-            actor_id=user.id, 
-            action=Actions.UPDATE_TAX_BRACKETS, 
-            cud=CUD.CREATE, 
-            economy_id=to_account.economy.economy_id, 
-            destination_account_id = to_account.account_id,
-            meta = make_serializable(kwargs)
-        ))
-        self.session.commit()
-        return tax_bracket
-
-
-
-
-    def delete_tax_bracket(self, user: Member, tax_name: str, economy: Economy):
-        if not self.has_permission(user, Permissions.MANAGE_TAX_BRACKETS, economy=economy):
-            raise BackendError("You do not have permission to create tax brackets in this economy")
-
-        tax_bracket = self.get_tax_bracket(tax_name, economy)
-        tax_bracket_id = tax_bracket.entry_id
-        if tax_bracket is None:
-            raise BackendError("No tax bracket of that name exists in this economy")
-
-        self.session.delete(tax_bracket)
-        logger.log(PUBLIC_LOG, f"Economy: {tax_bracket.economy.currency_name}\n {user.mention} deleted the tax bracket {tax_name}")
-        self.session.add(Transaction(
-            actor_id = user.id,
-            action=Actions.UPDATE_TAX_BRACKETS,
-            cud=CUD.DELETE,
-            economy_id=economy.economy_id,
-            meta = make_serializable({
-                "entry_id": tax_bracket_id,
-                "tax_name": tax_name
-            })
-        ))
-
-        self.session.commit()
-
-
-
-    def _perform_transaction_tax(self, amount: int, transaction: Transaction, economy: Economy) -> int:
-        """Performs taxation and returns the total amount of tax taken"""
-        vat_taxes = self.session.execute(select(Tax).where(Tax.tax_type==TaxType.VAT)
-                                         .where(Tax.economy_id==economy.economy_id)
-                                         .where(Tax.affected_type == self.get_account_by_id(transaction.target_account_id).account_type)
-                                         .order_by(Tax.bracket_start.desc())).all()
-        total_cum_tax = 0
-        for vat_tax in vat_taxes:
-            vat_tax = vat_tax[0]
-
-            accumulated_tax = 0
-
-            full_tax = ((vat_tax.bracket_end - vat_tax.bracket_start)*vat_tax.rate)//100
-            if amount >= vat_tax.bracket_end:
-                accumulated_tax += full_tax
-            else:
-                accumulated_tax += ((amount - vat_tax.bracket_start)*vat_tax.rate)//100
-            amount -= accumulated_tax
-            vat_tax.to_account.balance += accumulated_tax
-            total_cum_tax += accumulated_tax
-        return total_cum_tax
-
-
-    def perform_tax(self, user:Member, economy: Economy):
-        if not self.has_permission(user, Permissions.MANAGE_TAX_BRACKETS, economy=economy):
-            raise BackendError("You do not have permission to trigger taxes in this economy")
-        
-        wealth_taxes = self.session.execute(
-            select(Tax)
-            .where(
-                Tax.tax_type==TaxType.WEALTH,
-                Tax.economy_id==economy.economy_id
-            ).order_by(Tax.bracket_start.desc())
-        ).scalars()
-        
-        for wealth_tax in wealth_taxes:
-            print(wealth_tax.tax_name, wealth_tax.bracket_start, wealth_tax.bracket_end)
-            
-            accumulated_tax = 0
-            full_tax = ((wealth_tax.bracket_end - wealth_tax.bracket_start)*wealth_tax.rate)//100
-
-            accum = self._one_or_none(
-                                select(func.sum(((Account.balance-wealth_tax.bracket_start)*wealth_tax.rate)//100))
-                                .select_from(Account)
-                                .where(
-                                    Account.account_type == wealth_tax.affected_type,
-                                    Account.balance >= wealth_tax.bracket_start,
-                                    Account.balance < wealth_tax.bracket_end
-                                ))
-
-            print(accum)
-
-            accumulated_tax += accum if accum is not None else 0
-            self.session.execute(update(Account)
-                .where(
-                    Account.account_type == wealth_tax.affected_type,
-                    Account.balance >= wealth_tax.bracket_start,
-                    Account.balance < wealth_tax.bracket_end
-                )
-                .values(balance=Account.balance-(((Account.balance-wealth_tax.bracket_start)*wealth_tax.rate)//100))
-            )
-
-            # accum = self._one_or_none(select(func.count()).select_from(Account).where(Account.account_type == wealth_tax.affected_type).where(Account.balance >= wealth_tax.bracket_end))
-            # accumulated_tax += (accum if accum is not None else 0)*full_tax
-            # self.session.execute(update(Account).where(Account.account_type == wealth_tax.affected_type).where(Account.balance >= wealth_tax.bracket_end).values(balance=(Account.balance - full_tax)))
-            wealth_tax.to_account.balance += accumulated_tax
-
-        income_taxes = self.session.execute(select(Tax).where(Tax.tax_type==TaxType.INCOME).where(Tax.economy_id == economy.economy_id).order_by(Tax.bracket_start.desc())).all()
-
-        for income_tax in income_taxes:
-            income_tax = income_tax[0]
-            
-            accumulated_tax = 0
-
-            full_tax = ((income_tax.bracket_end - income_tax.bracket_start)*income_tax.rate)//100
-            accum = self._one_or_none(
-                        select(func.sum(((Account.income_to_date-income_tax.bracket_start)*income_tax.rate)//100))
-                        .select_from(Account)
-                        .where(Account.account_type == income_tax.affected_type)
-                        .where(Account.income_to_date >= income_tax.bracket_start)
-                        .where(Account.income_to_date < income_tax.bracket_end)
-                        .where(Account.economy_id == income_tax.economy_id)
-            )
-
-            self.session.execute(
-                        update(Account)
-                        .where(Account.account_type == income_tax.affected_type)
-                        .where(Account.income_to_date >= income_tax.bracket_start)
-                        .where(Account.income_to_date < income_tax.bracket_end)
-                        
-                        .values(balance=((Account.income_to_date-income_tax.bracket_start)*income_tax.rate)//100)
-            )
-            
-            accumulated_tax += accum if accum is not None else 0
-            
-            accum = self._one_or_none(select(func.count()).select_from(Account).where(Account.account_type == income_tax.affected_type).where(Account.income_to_date >= income_tax.bracket_end))
-            accumulated_tax += (accum if accum is not None else 0) * full_tax
-            self.session.execute(
-                        update(Account)
-                        .where(Account.account_type==income_tax.affected_type)
-                        .where(Account.income_to_date >= income_tax.bracket_end)
-                        .values(balance=(Account.balance - full_tax))
-            )
-            
-            debtors = self.session.execute(select(Account).where(Account.balance < 0)).all()
-            for debtor in debtors:
-                debtor = debtor[0]
-                debt = -debtor.balance
-                accumulated_tax -= debt
-                debtor.balance = 0
-                logger.log(PRIVATE_LOG, f'Economy: {debtor.economy.currency_name}\n{debtor.account_name} failed to meet their tax obligations and still owe {frmt(debt)}')
-            self.session.execute(update(Account).values(income_to_date=0))
-            income_tax.to_account.balance += accumulated_tax
-
-        logger.log(PUBLIC_LOG, f'Economy: {economy.currency_name}\n {user.mention} triggered a tax cycle')
-        
-        self.session.add(Transaction(
-            actor_id = user.id,
-            action = Actions.PERFORM_TAXES,
-            cud = CUD.UPDATE,
-            economy_id = economy.economy_id,
-        ))
-
-        self.session.commit()
-
-
-    """Permissions"""
-
-    def _reset_permission(self, user_id, permission, account, economy):
-        stmt = (delete(Permission)
-                .where(Permission.user_id == user_id)
-                .where(Permission.permission == permission)
-                .where(Permission.economy_id == (economy.economy_id if economy is not None else None))
-                .where(Permission.account_id == (account.account_id if account is not None else None))
-        )
-        self.session.execute(stmt)
-    
-    
-
-    def _change_permission(self, user_id, permission, account, economy, allowed):
-        if economy is None and account is not None:
-            economy = account.economy
-        self._reset_permission(user_id, permission, account, economy)
-        acc_id = account.account_id if account is not None else None
-        econ_id = economy.economy_id if economy is not None else None
-        permission = Permission(entry_id=uuid4(), user_id = user_id, account_id=acc_id, economy_id=econ_id,  permission=permission, allowed=allowed)
-        self.session.add(permission)
-
-    
-
-    def toggle_ephemeral(self, actor: Member):
-        self._change_permission(actor.id, Permissions.USES_EPHEMERAL, None, None, not self.has_permission(actor, Permissions.USES_EPHEMERAL))
-        self.session.commit() 
-
-
-    def reset_permission(self, actor: Member, affected_id:int, permission:Permissions, account: Account = None, economy: Economy = None):
-        if not self.has_permission(actor, Permissions.MANAGE_PERMISSIONS,  economy=economy):
-            raise BackendError("You do not have permission to manage permissions here")
-
-        self._reset_permission(affected_id, permission, account, economy)
-        self.session.add(Transaction(
-            actor_id=actor.id,
-            economy_id = economy.economy_id if economy is not None else None,
-            target_account_id = account.account_id if account is not None else None,
-            action = Actions.UPDATE_PERMISSIONS,
-            cud = CUD.DELETE,
-            meta = {
-                "affected_id": affected_id,
-                "affected_permission": "ALL"
-            }
-        ))
-        self.session.commit()
-
-
-    def change_permissions(self, actor: Member, affected_id: int, permission: Permissions, account: Account = None, economy: Economy = None, allowed: bool = True):
-        if not self.has_permission(actor, Permissions.MANAGE_PERMISSIONS, economy=economy):
-            raise BackendError("You do not have permission to manage permissions here")
-        self._change_permission(affected_id, permission, account, economy, allowed)
-        self.session.add(Transaction(
-            actor_id = actor.id,
-            action = Actions.UPDATE_PERMISSIONS,
-            cud = CUD.UPDATE,
-            economy_id=economy.economy_id if economy is not None else None,
-            target_account_id = account.account_id if account is not None else None,
-            meta = make_serializable({
-                "affected_id": affected_id,
-                "permissions": [permission],
-                "allowed": allowed
-            })
-        ))
-        self.session.commit()
-
-    def change_many_permissions(self, actor: Member, affected_id: int, *permissions, account: Account = None, economy: Economy = None, allowed: bool = True):
-        if not self.has_permission(actor, Permissions.MANAGE_PERMISSIONS, economy=economy):
-            raise BackendError("You do not have permission to manage permissions here")
-        for permission in permissions:
-            self._change_permission(affected_id, permission, account, economy, allowed)
-        self.session.add(Transaction(
-            actor_id = actor.id,
-            action = Actions.UPDATE_PERMISSIONS,
-            cud = CUD.UPDATE,
-            economy_id =  economy.economy_id if economy is not None else None,
-            target_account_id = account.account_id if account is not None else None,
-            meta = make_serializable({
-                "affected_id": affected_id,
-                "permissions": permissions,
-                "allowed": allowed
-            })
-        ))
-        self.session.commit()
-
-
-    """Economies"""
-
-    def get_economies(self):
-        return [i[0] for i in self.session.execute(select(Economy)).all()]
-
-    def create_economy(self, user: Member, currency_name: str, currency_unit: str) -> Economy:
-        if not self.has_permission(user, Permissions.MANAGE_ECONOMIES):
-            raise BackendError("You do not have permission to create economies")
-        
-        if self.get_economy_by_name(currency_name):
-            raise BackendError("An economy by that name already exists")
-
-        economy = Economy(economy_id=uuid4(), currency_name=currency_name, currency_unit=currency_unit, owner_guild_id = user.guild.id)
-        
-        if self.get_guild_economy(user.guild.id) is not None:
-            raise BackendError("This guild is already registered to an economy")
-
-        self.session.add(Guild(guild_id=user.guild.id, economy_id=economy.economy_id))
-        self.session.add(economy)
-        self.change_many_permissions(StubUser(0), user.id, Permissions.MANAGE_PERMISSIONS, economy=economy)
-
-        self.session.commit()
-        logger.log(PUBLIC_LOG, f'{user.mention} created the economy {currency_name}')
-        self.session.add(Transaction(
-            actor_id = user.id,
-            action = Actions.UPDATE_ECONOMIES,
-            cud = CUD.CREATE,
-            economy_id = economy.economy_id
-        ))
-        return economy
-
-
-    def get_economy_by_name(self, name: str):
-        return self._one_or_none(select(Economy).where(Economy.currency_name == name))
-        
-
-    def get_economy_by_id(self, economy_id: UUID):
-        return self._one_or_none(select(Economy).where(Economy.economy_id == economy_id))
-
-    def register_guild(self, user: Member, guild_id: int, economy: Economy):
-        if not self.has_permission(user, Permissions.MANAGE_ECONOMIES, economy=economy):
-            raise BackendError("You do not have permission to manage economies")
-
-        if self._one_or_none(select(Guild).where(Guild.guild_id == guild_id)) is not None:
-            self.unregister_guild(user, guild_id)
-        guild = Guild(guild_id=guild_id, economy_id=economy.economy_id)
-        self.session.add(guild)
-        logger.log(PUBLIC_LOG, f'{user.mention} registered the guild with id: {guild_id} to the economy {economy.currency_name}')
-        self.session.commit()
-    
-    def unregister_guild(self, user: Member, guild_id:int):
-        if not self.has_permission(user, Permissions.MANAGE_ECONOMIES, economy=self.get_guild_economy(guild_id)):
-            raise BackendError("You do not have permission to manage economies")
-        
-        if len(self.session.execute(select(Economy).where(Economy.owner_guild_id == guild_id)).all()) != 0:
-            raise BackendError("This guild is the owner guild of an economy, cannot change the economy its registered to")
-        guild = self.session.get(Guild, guild_id)
-        self.session.delete(guild)
-        self.session.commit()
-    
-
-    def get_guild_economy(self, guild_id: int) -> Optional[Economy]:
-        guild = self.session.get(Guild, guild_id)
-        return None if guild is None else guild.economy
-
-    @staticmethod
-    def get_guild_ids(economy: Economy) -> List[int]:
-        return [i.guild_id for i in economy.guilds]
-
-    def delete_economy(self, user: Member, economy: Economy) -> None:
-        econ_id = economy.economy_id if economy is not None else None
-        if not self.has_permission(user, Permissions.MANAGE_ECONOMIES, economy=economy):
-            raise BackendError("You do not have permission to delete this economy")
-        self.session.execute(delete(Guild).where(Guild.economy_id == economy.economy_id))
-        
-        self.session.delete(economy)
-        self.session.add(Transaction(
-            actor_id = user.id,
-            action = Actions.UPDATE_ECONOMIES,
-            cud = CUD.DELETE,
-            economy_id = econ_id
-        ))
-        self.session.commit()
-
-    """Accounts"""
-
-    def create_account(self, authorisor: Member, owner_id: int, economy: Economy, name: str=None, account_type: AccountType=AccountType.USER) -> Account:
-        if not self.has_permission(authorisor, Permissions.OPEN_ACCOUNT, economy=economy):
-            raise BackendError("You do not have permissions to open accounts")
-
-        name = name if name is not None else f"<@!{owner_id}> 's account"
-        if len(name) > 64:
-            raise BackendError("That name is too long")
-        if account_type == AccountType.USER and owner_id is not None and owner_id == authorisor.id:
-            acc = self.get_user_account(owner_id, economy)
-            if acc is not None:
-                raise BackendError("You already have a user account")
-        elif not self.has_permission(authorisor, Permissions.OPEN_SPECIAL_ACCOUNT, economy=economy):
-            raise BackendError("You do not have permission to open special accounts")
-        elif name is not None and (acc := self.get_account_by_name(name, economy)) is not None:
-            raise BackendError(f"Account with name {name} already exists")
-            
-        account = Account(account_id=uuid4(), account_name=name, owner_id=owner_id, account_type=account_type, balance=0, economy=economy)
-        self.session.add(account)
-        self.session.add(Transaction(
-            actor_id = authorisor.id,
-            economy_id = economy.economy_id if economy is not None else None,
-            action = Actions.UPDATE_ACCOUNTS,
-            cud = CUD.CREATE,
-            meta = make_serializable({
-                "account_type": account_type,
-                "owner_id": owner_id
-            })
-        ))      
-
-        self.session.commit()
-        return account
-
-    def transfer_ownership(self, authorisor: User | Member, account: Account, new_owner_id: int):
-        '''
-        Transfers the ownership of an account from one user to another.
-        :param authorisor: The initiator of this procedure.
-        :param account: The account whose ownership will be transferred.
-        :param new_owner_id: The Discord user ID of the new owner.
-        :returns: The account with the new changes.
-        '''
-
-        if not self.has_permission(authorisor, Permissions.CLOSE_ACCOUNT, account=account):
-            raise BackendError("You do not have the permission to transfer the ownership of this account.")
-
-        old_owner_id = account.owner_id
-        try:
-            account.owner_id = new_owner_id
-
-            self.session.add(Transaction(
-                actor_id = authorisor.id,
-                economy_id = account.economy.economy_id,
-                target_account_id = account.account_id,
-                action = Actions.UPDATE_ACCOUNTS,
-                cud = CUD.UPDATE,
-                meta = make_serializable({
-                    "old_owner_id": old_owner_id,
-                    "new_owner_id": new_owner_id
-                })
-            ))
-            
-            self.session.commit()
-        except Exception as e:
-            self.session.rollback()
-            raise BackendError(f"Could not transfer account ownership: {e}.")
-        else:
-            return account
-
-    def delete_account(self, authorisor: Member, account):
-        if not self.has_permission(authorisor, Permissions.CLOSE_ACCOUNT, account=account, economy=account.economy):
-            raise BackendError("You do not have permission to close this account")
-        acc_id = account.account_id
-        econ_id = account.economy.economy_id
-        account.deleted = True
-        self.session.add(Transaction(
-            actor_id = authorisor.id,
-            economy_id = econ_id,
-            target_account_id = acc_id,
-            action = Actions.UPDATE_ACCOUNTS,
-            cud = CUD.DELETE
-        ))
-        self.session.commit()
-
-    def get_user_account(self, user_id: int, economy: Economy) -> Account | None:
-        return self._one_or_none(select(Account).where(Account.owner_id == user_id).where(Account.account_type == AccountType.USER).where(Account.economy_id == economy.economy_id).where(Account.deleted==False))
-
-    def get_account_by_name(self, account_name: str, economy: Economy) -> Account | None:
-        return self._one_or_none(select(Account).where(Account.account_name == account_name).where(Account.economy_id == economy.economy_id).where(Account.deleted==False))
-
-    def get_account_by_id(self, account_id: UUID) -> Account | None:
-        return self._one_or_none(select(Account).where(Account.account_id == account_id))
-
-
-
-    """Transfers"""
-
-
-    def get_transaction_log(self, user: Member, account: Account, limit=None): 
-        if not self.has_permission(user, Permissions.VIEW_BALANCE, account=account):
-            raise BackendError("You do not have permissions to view the transaction log on this account")
-        stmt = select(Transaction).where((Transaction.target_account_id == account.account_id) | (Transaction.destination_account_id == account.account_id)).where(Transaction.action == Actions.TRANSFER).order_by(Transaction.timestamp.desc())
-        stmt = stmt.limit(limit)
-        r = self.session.execute(stmt)
-        results = [i[0] for i in r.all()]
-        return results
-    
-
-    
-    def create_recurring_transfer(self, user: Member, from_account: Account, to_account: Account, amount: int, payment_interval: int, number_of_payments: int = None, transaction_type: TransactionType = TransactionType.INCOME) -> None:
-        if not self.has_permission(user, Permissions.TRANSFER_FUNDS, account=from_account, economy=from_account.economy):
-            raise BackendError("You do not have permission to transfer funds on this account")
-        rec_transfer = RecurringTransfer(
-                entry_id = uuid4(),
-                authorisor_id = user.id,
-                from_account_id=from_account.account_id,
-                to_account_id = to_account.account_id,
-                amount = amount,
-                last_payment_timestamp = time.time(),
-                payment_interval = payment_interval,
-                transaction_type = transaction_type,
-                number_of_payments_left = number_of_payments - 1
-        )
-
-        self.session.add(rec_transfer)
-        self.session.commit()
-        self.perform_transaction(user, rec_transfer.from_account, rec_transfer.to_account, rec_transfer.amount, rec_transfer.transaction_type)
-
-    def subscribe(self, user, account):
-        if not self.has_permission(user, Permissions.VIEW_BALANCE, account=account):
-            raise BackendError("You do not have permissions to subscribe to transaction_notifs for this account")
-        self.unsubscribe(user, account)
-        self.session.add(BalanceUpdateNotifier(notifier_id = uuid4(), owner_id = user.id, account_id = account.account_id))
-        self.session.commit()
-
-    def unsubscribe(self, user, account):
-        [self.session.delete(notifier) for notifier in account.update_notifiers if notifier.owner_id == user.id]
-        self.session.commit()
-
-        
-        
-    def perform_transaction(self, user: Member, from_account: Account, to_account: Account, amount: int, transaction_type: TransactionType = TransactionType.PERSONAL):
-        """Performs a transaction from one account to another accounting for tax, returns a boolean indicating if the transaction was successful"""
-        if not self.has_permission(user, Permissions.TRANSFER_FUNDS, account=from_account, economy=from_account.economy):
-            raise BackendError("You do not have permission to transfer funds from that account")
-
-        if from_account.economy_id != to_account.economy_id:
-            raise BackendError("Cannot transfer funds from one economy to another")
-
-        if from_account.balance < amount:
-            raise BackendError("You do not have sufficient funds to transfer from that account")
-
-        if from_account.account_id == to_account.account_id:
-            return 
-
-        transaction = Transaction(
-            actor_id=user.id,
-            economy_id=from_account.economy_id,
-            target_account_id=from_account.account_id,
-            destination_account_id=to_account.account_id,
-            action=Actions.TRANSFER,
-            cud=CUD.UPDATE,
-            amount=amount
-        )
-
-        if transaction_type == TransactionType.INCOME:
-            to_account.income_to_date += amount
-        from_account.balance -= amount
-        amount -= self._perform_transaction_tax(amount, transaction, from_account.economy)
-        to_account.balance += amount
-
-
-        log = PRIVATE_LOG
-        if self.has_permission(user, Permissions.GOVERNMENT_OFFICIAL, economy=from_account.economy):
-            log = PUBLIC_LOG
-        logger.log(log, f"Economy: {from_account.economy.currency_name}\n{user.mention} transferred {frmt(amount)} from {from_account.account_name} to {to_account.account_name}")
-        self.session.add(transaction)
-
-        self.notify_users(to_account.get_update_notifiers(), f"{user.mention} transferred {frmt(amount)} from {from_account.account_name} to {to_account.account_name}, \n it\'s new balance is {to_account.get_balance()}", "Balance Update")
-        self.notify_users(from_account.get_update_notifiers(), f'{user.mention} transferred {frmt(amount)} from an account you watch ({from_account.account_name}), to {to_account.account_name} \n {from_account.account_name}\'s new balance is {from_account.get_balance()}', "Balance Update")
-        self.session.commit()
-
-    def print_money(self, user: Member, to_account: Account, amount: int):
-        if not self.has_permission(user, Permissions.MANAGE_FUNDS, account=to_account, economy=to_account.economy):
-            raise BackendError("You do not have permission to print funds")
-        to_account.balance += amount
-        logger.log(PUBLIC_LOG, f'Economy: {to_account.economy.currency_name}\n{user.mention} printed {frmt(amount)} to {to_account.account_name}')
-        self.session.add(Transaction(
-            actor_id = user.id,
-            economy_id = to_account.economy.economy_id,
-            destination_account_id = to_account.account_id,
-            action=Actions.MANAGE_FUNDS,
-            cud=CUD.CREATE,
-            amount=amount
-        ))
-        self.notify_users(to_account.get_update_notifiers(), f'{user.mention} printed {frmt(amount)} to {to_account.account_name},\n it\'s new balance is {to_account.get_balance()}', "Balance Update")
-        self.session.commit()
-
-    def remove_funds(self, user: Member, from_account: Account, amount: int):
-        if not self.has_permission(user, Permissions.MANAGE_FUNDS, account=from_account, economy=from_account.economy):
-            raise BackendError("You do not have permission to remove funds")
-        if from_account.balance < amount:
-            raise BackendError("There are not sufficient funds in this account to perform this action")
-        from_account.balance -= amount
-        logger.log(PUBLIC_LOG, f'Economy: {from_account.economy.currency_name}\n {user.mention} removed {frmt(amount)} from {from_account.account_name}')
-        self.session.add(Transaction(
-            actor_id = user.id,
-            action = Actions.MANAGE_FUNDS,
-            cud = CUD.DELETE,
-            target_account_id = from_account.account_id,
-            economy_id = from_account.economy.economy_id,
-            amount = amount
-        ))
-        self.notify_users(from_account.get_update_notifiers(), f'{user.mention} removed {frmt(amount)} from {from_account.account_name},\n it\'s new balance is {from_account.get_balance()}', "Balance Update")
-        self.session.commit()
-
-    def delete_key(self, key):
-        self.session.execute(Delete(Permission).where(Permission.user_id == key.key_id))
-        self.session.delete(key)
-        self.session.commit()
-
+	"""An object used to call the backend database."""
+	
+	def __init__(self, path: str, **engine_options):
+		"""
+		:param path: A path or database URI to the database.
+		:param engine_options: Dialect-dependent engine options.
+		"""
+		# try to get the running loop first because the engine functions are async and these are all sync
+		try:
+			self.loop = asyncio.get_running_loop()
+		except RuntimeError:
+			self.loop = None
+
+		self.engine = create_async_engine(path, **engine_options)
+		
+		# apparently sessions are meant to be short-lived, oops
+		self._sessionmaker = async_sessionmaker(self.engine, expire_on_commit=False)
+		
+		# we don't want this to conflict with discord.py's loop or aiohttp's because we cannot have 2 loops
+		if self.loop and self.loop.is_running():
+			self.loop.create_task(self._init_base())
+		else:
+			self.loop = asyncio.new_event_loop()
+			asyncio.set_event_loop(self.loop)
+			self.loop.run_until_complete(self._init_base())
+
+	async def _init_base(self):
+		async with self.engine.begin() as conn:
+			await conn.run_sync(Base.metadata.create_all)
+
+	async def _one_or_none(self, stmt, *, _session: Optional[AsyncSession] = None):
+		"""
+		Returns one or None as a result of the statement.
+		
+		:param stmt: Statement to execute.
+		:param session: (optional) Session to batch execute.
+		"""
+		if _session:
+			return (await _session.execute(stmt)).scalar_one_or_none()
+		else:
+			async with self._sessionmaker() as session:
+				return (await session.execute(stmt)).scalar_one_or_none()
+
+	async def tick(self):
+		"""
+		Triggers a tick in the server.
+		Must be triggered externally.
+		"""
+		tick_time = time.time()
+
+		async with self._sessionmaker.begin() as session:
+			transfer_time = RecurringTransfer.last_payment_timestamp + RecurringTransfer.payment_interval
+
+			transfers = (
+				await session.execute(
+					select(RecurringTransfer)
+					.options(
+						joinedload(RecurringTransfer.from_account).joinedload(Account.economy),
+						joinedload(RecurringTransfer.to_account)
+					)
+					.where(transfer_time <= tick_time)
+					.order_by(transfer_time.asc())
+				)
+			).scalars().all()
+
+			for transfer in transfers:
+				number_of_transfers = int((tick_time - transfer.last_payment_timestamp) // transfer.payment_interval)
+				payments_left = transfer.number_of_payments_left
+				
+				for _ in range(number_of_transfers):
+					if payments_left == 0:
+						await session.delete(transfer)
+						break
+
+					try:
+						authorisor = await self.get_member(transfer.authorisor_id, transfer.from_account.economy.owner_guild_id) or StubUser(transfer.authorisor_id)
+						await self.perform_transaction(authorisor, transfer.from_account, transfer.to_account, transfer.amount, transfer.transaction_type)
+						if payments_left and payments_left > 0:
+							payments_left -= 1
+					except Exception as e:
+						logger.log(LogLevels.Private, f"Failed to perform recurring transaction of {frmt(transfer.amount)} from {transfer.from_account.account_name} to {transfer.to_account.account_name} due to: {e}")
+						await self.notify_user(transfer.authorisor_id, f"Your recurring transaction of {frmt(transfer.amount)} every {transfer.payment_interval // DAY_TO_SECOND} day(s) to {transfer.to_account.account_name} was cancelled due to: {e}", "Failed Reccurring Transfer")
+						await session.delete(transfer)
+				else:
+					transfer.number_of_payments_left = payments_left
+					transfer.last_payment_timestamp = tick_time
+
+	# === Permissions and API Applications ===
+
+	async def get_permissions(self, user: User, economy: Optional[Economy] = None) -> Sequence[Permission]:
+		"""
+		Returns a member (or stub member)'s permissions.
+		
+		:param user: A member-like object.
+		:param economy: (optional) Economy for economy-based permissions.
+		
+		:returns: A list of permissions.
+		"""
+		stmt = select(Permission) \
+				.where(Permission.user_id.in_([user.id] + _get_roles(user)))
+				
+		if economy:
+			stmt = stmt.where(Permission.economy_id == economy.economy_id).options(joinedload(Permission.economy_id))
+
+		async with self._sessionmaker() as session:
+			return (
+				await session.execute(stmt)
+			).scalars().all()
+
+	async def get_authable_accounts(self, user: User, economy: Optional[Economy] = None)  -> Sequence[Account]:
+		"""
+		Returns all accounts a member owns or has permissions for.
+		
+		:param user: A member-like object.
+		:param economy: (optional) Economy for economy-based permissions.
+		
+		:returns: A list of accounts.
+		"""
+		stmt = select(Account) \
+			  .outerjoin(Permission) \
+			  .where(
+				or_(
+					Permission.user_id.in_([user.id] + _get_roles(user)),
+					Account.owner_id == user.id
+				)
+			  ) \
+			  .distinct()
+
+		if economy:
+			stmt = stmt.where(Permission.economy_id == economy.economy_id).options(joinedload(Permission.economy_id))
+
+		async with self._sessionmaker() as session:
+			return (
+				await session.execute(stmt)
+			).scalars().all()
+
+	async def key_has_permission(self, key: APIKey, permission: Permissions, account: Optional[Account] = None, economy: Optional[Economy] = None) -> bool:
+		"""
+		Checks if an API key is allowed/authorized to do something.
+
+		:param user: A stub user object, or a Discord member object for permissions tied to roles.
+		:param permission: The permission to check.
+		:param account: (optional) The permission's account constraint.
+		:param economy: (optional) The permission's economy constraint.
+		
+		:returns: Whether the user is authorized with said permission.
+		"""
+
+		actor = await self.get_member(key.issuer_id, key.application.economy.owner_guild_id) or StubUser(key.issuer_id)
+		return await self.has_permission(StubUser(key.key_id), permission, account, economy) \
+		   and await self.has_permission(actor, permission, account, economy)
+
+	async def has_permission(self, user: User, permission: Permissions, account: Optional[Account] = None, economy: Optional[Economy] = None) -> bool:
+		"""
+		Checks if a user is allowed/authorized to do something.
+		
+		:param user: A stub user object, or a Discord member object for permissions tied to roles.
+		:param permission: The permission to check.
+		:param account: (optional) The permission's account constraint.
+		:param economy: (optional) The permission's economy constraint.
+		
+		:returns: Whether the user is authorized with said permission.
+		"""
+		if user.id == CONSOLE_USER_ID:
+			return True
+		elif account and not economy:
+			economy = await self.get_economy_by_id(account.economy_id)
+		
+		stmt = select(Permission) \
+			  .where(
+				and_(
+					Permission.permission == permission,
+					Permission.user_id.in_([user.id] + _get_roles(user)),
+					or_(
+						Permission.account_id == account.account_id if account else Permission.account_id.is_(None),
+						Permission.economy_id == economy.economy_id if economy else Permission.economy_id.is_(None)
+					)
+				)
+			  ) \
+			  .distinct()
+
+		default = False
+		owner_id = account.owner_id if account is not None else None
+
+		if permission in DEFAULT_GLOBAL_PERMISSIONS or (permission in DEFAULT_OWNER_PERMISSIONS \
+														and owner_id in [user.id] + _get_roles(user)):
+			default = True
+
+		async with self._sessionmaker() as session:
+			results = list((await session.execute(stmt)).scalars().all())
+
+			if len(results) == 0:
+				return default
+
+			def _evaluate(perm: Permission):
+				# Precedence for result: 
+				# 1. Account & economy are null
+				# 2. Account is null
+				# 3. Account & economy are not null, user
+				# 4. Account & economy are not null, role
+				# Economy cannot be null without account being null
+				if perm.account_id is None and perm.economy_id is None:
+					return 1
+				elif perm.account_id is None:
+					return 2
+				return 3 if perm.user_id == user.id else 4
+
+			# global permissions (economy = null) > economy permissions (account = null) > user permissions > role permissions
+			best = results.pop(0)
+			for r in results:
+				eval_r = _evaluate(r)
+				eval_best = _evaluate(best)
+
+				if eval_r < eval_best:
+					best = r
+				elif eval_r == eval_best and isinstance(user, discord.Member):
+					r_b = user.guild.get_role(best.user_id)
+					r_r = user.guild.get_role(r.user_id)
+					if r_r and r_b and r_b < r_r:
+						best = r
+		
+		return best.allowed
+
+	async def get_application(self, app_id: UUID) -> Optional[Application]:
+		"""
+		Fetch an API application by its ID.
+		
+		:param app_id: The application ID.
+		
+		:returns: The application if it exists, else `None`.
+		"""
+		return await self._one_or_none(select(Application).where(Application.application_id == app_id).options(joinedload(Application.economy)))
+
+	async def get_user_applications(self, user_id: int) -> Sequence[Application]:
+		"""
+		Fetch all applications owned by a user.
+		
+		:param user_id: The user ID of the user.
+		
+		:returns: A list of applications owned by the user.
+		"""
+		async with self._sessionmaker() as session:
+			return (await session.execute(
+				select(Application) \
+				.where(Application.owner_id == user_id)
+				.options(joinedload(Application.economy))
+			)).scalars().all()
+
+	async def get_application_keys(self, app_id: UUID) -> Sequence[APIKey]:
+		"""
+		Fetch all API keys created by an application.
+		
+		:param app_id: The application UUID of the application.
+		
+		:returns: A list of the API keys created by the application.
+		"""
+		async with self._sessionmaker() as session:
+			return (await session.execute(
+				select(APIKey) \
+				.where(APIKey.application_id == app_id)
+				.options(joinedload(Application.economy))
+			)).scalars().all()
+
+	async def create_application(self, actor: User, name: str, owner_id: int, economy: Economy) -> Application:
+		"""
+		Creates a new API application.
+		
+		:param actor: The actor of this action.
+		:param name: The name of the application.
+		:param owner_id: The user ID of the application's owner.
+		:param economy: The economy in which the application is based in.
+		
+		:returns: The new application.
+		
+		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
+		"""
+		if not await self.has_permission(actor, Permissions.MANAGE_ECONOMIES, economy=economy):
+			raise UnauthorizedException(f"You do not have permission to create applications in this economy")
+
+		app = Application(
+			application_id = uuid4(),
+			application_name = name,
+			owner_id = owner_id,
+			economy_id = economy.economy_id
+		  )
+
+		async with self._sessionmaker.begin() as session:
+			session.add(app)
+			session.add(
+				Transaction(
+					actor_id=actor.id, 
+					action=Actions.UPDATE_ECONOMIES, 
+					cud=CUD.CREATE,
+					meta={
+						"type": "APPLICATION",
+						"application_id": app.application_id,
+						"application_owner": owner_id
+					}
+				)
+			)
+
+		return app
+
+	async def delete_application(self, actor: User, app_id: UUID, economy: Economy):
+		"""
+		Deletes an API application.
+		
+		:param actor: The actor of this action.
+		:param app_id: The UUID of the application.
+		:param economy: The economy in which the application is based in.
+		
+		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
+		:raises NotFoundException: Raises a not found exception if the specified application does not exist.
+		"""
+		if not await self.has_permission(actor, Permissions.MANAGE_ECONOMIES, economy=economy):
+			raise UnauthorizedException(f"You do not have permission to delete applications in this economy")
+
+		application = await self.get_application(app_id)
+		if not application:
+			raise NotFoundException(f"No application with UUID ({app_id}) exists")
+
+		async with self._sessionmaker.begin() as session:
+			session.add(
+				Transaction(
+					actor_id=actor.id, 
+					action=Actions.UPDATE_ECONOMIES, 
+					cud=CUD.DELETE, 
+					meta={
+						"type": "APPLICATION",
+						"application_id": application.application_id,
+						"application_owner": application.owner_id
+					}
+				)
+			)
+			await session.delete(application)
+
+	# === API Keys ===
+
+	async def get_key(self, app: Application, ref_id: UUID) -> Optional[APIKey]:
+		"""
+		Fetch an API key by its application and custom reference UUID.
+		
+		:param app: The application which created the API key.
+		:param ref_id: The custom reference UUID supplied by the application.
+		:param _session: (optional) A pre-existing session to query with.
+		
+		:returns: The API key if it exists, else `None`.
+		"""
+		return await self._one_or_none(
+			select(APIKey)
+			.where(APIKey.application_id == app.application_id, APIKey.internal_app_id == ref_id)
+			.options(joinedload(APIKey.application).joinedload(Application.economy))
+		)
+
+	async def get_key_by_id(self, key_id: int) -> Optional[APIKey]:
+		"""
+		Fetch an API key by its ID.
+		
+		:param key_id: The key ID.
+		
+		:returns: The API key if it exists, else `None`.
+		"""
+		return await self._one_or_none(
+			select(APIKey)
+			.where(APIKey.key_id == key_id)
+			.options(joinedload(APIKey.application).joinedload(Application.economy))
+		)
+
+	async def initialize_key(self, app: Application, ref_id: UUID, issuer_id: int) -> APIKey:
+		"""
+		Initialize a new API key.
+		
+		:param application: The application creating this API key.
+		:param ref_id: The custom reference UUID supplied by the application.
+		:param issuer_id: The user ID of the issuer of this key.
+		
+		:returns: The new API key.
+		"""
+		async with self._sessionmaker.begin() as session:
+			# check if a key with this ref. ID already exists
+			current_key = await self.get_key(app, ref_id)
+			if current_key:
+				await session.delete(current_key)
+
+			new_key = APIKey(application=app, internal_app_id=ref_id, issuer_id=issuer_id)
+
+			session.add(new_key)
+			session.add(
+				Transaction(
+					actor_id=issuer_id, 
+					action=Actions.UPDATE_ECONOMIES, 
+					cud=CUD.CREATE, 
+					meta={
+						"type": "API_KEY",
+						"application_id": app.application_id,
+						"ref_id": ref_id
+					}
+				)
+			)
+
+		return new_key
+
+	async def delete_key(self, actor: User, key: APIKey):
+		"""
+		Delete an API key.
+		
+		:param actor: The actor of this action.
+		:param key: The API key.
+		
+		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
+		"""
+		if not await self.has_permission(actor, Permissions.MANAGE_ECONOMIES, economy=key.application.economy):
+			raise UnauthorizedException(f"You do not have permission to delete keys in this economy")
+		
+		async with self._sessionmaker.begin() as session:
+			session.add(
+				Transaction(
+					actor_id=actor.id, 
+					action=Actions.UPDATE_ECONOMIES, 
+					cud=CUD.DELETE, 
+					meta={
+						"type": "API_KEY",
+						"application_id": key.application.application_id,
+						"ref_id": key.internal_app_id
+					}
+				)
+			)
+			await session.execute(delete(Permission).where(Permission.user_id == key.key_id))
+			await session.delete(key)
+
+	# === Taxes ===
+
+	async def get_tax_bracket(self, tax_name: str, economy: Economy) -> Optional[Tax]:
+		"""
+		Fetches a tax bracket by its name.
+		
+		:param tax_name: The name of the tax bracket.
+		:param economy: The economy in which the tax bracket is based in.
+		
+		:returns: The tax bracket if it exists, else `None`.
+		"""
+		return await self._one_or_none(select(Tax).where(Tax.tax_name == tax_name, Tax.economy_id == economy.economy_id))
+
+	async def get_tax_brackets(self, economy: Economy) -> Sequence[Tax]:
+		"""
+		Fetches all tax brackets in an economy.
+		
+		:param economy: The economy in which the tax brackets are based in.
+		
+		:returns: A list of tax brackets in the economy.
+		"""
+		async with self._sessionmaker() as session:
+			return (
+				await session.execute(
+					select(Tax).where(Tax.economy_id == economy.economy_id)
+				)
+			).scalars().all()
+
+	async def create_tax_bracket(self, actor: User, tax_name: str, affected_type: AccountType, tax_type: TaxType, bracket_start: int, bracket_end: int, rate: int, to_account: Account) -> Tax:
+		"""
+		Creates a new tax bracket.
+		
+		:param actor: The actor of this action.
+		:param tax_name: The name of the new tax bracket.
+		:param affected_type: The account type affected by this tax bracket.
+		:param tax_type: The type of the new tax bracket.
+		:param bracket_start: The starting balance amount for the tax bracket to apply.
+		:param bracket_end: The final balance amount in which this tax bracket can apply.
+		:param rate: The percentage rate of the new tax bracket.
+		:param to_account: The account where tax revenue will be collected.
+		:returns: The new tax bracket.
+
+		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
+		:raises AlreadyExistsException: Raises an already exists exception if a tax bracket exists with the same name provided.
+		"""
+		if not await self.has_permission(actor, Permissions.MANAGE_TAX_BRACKETS, economy=to_account.economy):
+			raise UnauthorizedException("You do not have the permission to manage tax brackets in this economy")
+		elif await self.get_tax_bracket(tax_name, to_account.economy):
+			raise AlreadyExistsException("A tax bracket of that name already exists in this economy")
+
+		kwargs = {
+			"entry_id": uuid4(),
+			"tax_name": tax_name,
+			"affected_type": affected_type,
+			"tax_type": tax_type,
+			"bracket_start": bracket_start,
+			"bracket_end": bracket_end,
+			"rate": rate,
+			"to_account_id": to_account.account_id,
+			"economy_id": to_account.economy.economy_id
+		}
+		tax_bracket = Tax(**kwargs)
+
+		async with self._sessionmaker.begin() as session:
+			session.add(tax_bracket)
+			session.add(
+				Transaction(
+					actor_id = actor.id, 
+					action = Actions.UPDATE_TAX_BRACKETS, 
+					cud = CUD.CREATE, 
+					economy_id = to_account.economy.economy_id, 
+					destination_account_id = to_account.account_id,
+					meta = make_serializable(kwargs)
+				)
+			)
+
+			logger.log(LogLevels.Public, f"Economy: {to_account.economy.currency_name}\n<@!{actor.id}> created a new tax bracket by the name {tax_name}")
+
+		return tax_bracket
+
+	async def delete_tax_bracket(self, actor: User, tax_name: str, economy: Economy):
+		"""
+		Deletes a tax bracket.
+		
+		:param actor: The actor of this action.
+		:param tax_name: The name of the tax bracket.
+		:param economy: The economy in which the tax bracket is based in.
+	
+		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
+		:raises NotFoundException: Raises a not found exception if the specified tax bracket does not exist.
+		:raises BackendException: Raises a backend exception if an error occurs during the database session.
+		"""
+		if not await self.has_permission(actor, Permissions.MANAGE_TAX_BRACKETS, economy=economy):
+			raise UnauthorizedException("You do not have the permission to manage tax brackets in this economy")
+		elif not (tax_bracket := await self.get_tax_bracket(tax_name, economy)):
+			raise NotFoundException("A tax bracket of that name does not exists in this economy")
+
+		async with self._sessionmaker.begin() as session:
+			await session.delete(tax_bracket)
+			session.add(
+				Transaction(
+					actor_id = actor.id,
+					action = Actions.UPDATE_TAX_BRACKETS,
+					cud = CUD.DELETE,
+					economy_id = economy.economy_id,
+					meta = make_serializable({
+						"entry_id": tax_bracket.entry_id,
+						"tax_name": tax_name
+					})
+				)
+			)
+
+			logger.log(LogLevels.Public, f"Economy: {economy.currency_name}\n<@!{actor.id}> deleted tax bracket {tax_name}")
+
+	async def _perform_transaction_tax(self, amount: int, economy_id: UUID, affected_type: AccountType, session: AsyncSession) -> int:
+		"""
+		Performs all transaction taxes (VAT) of an economy on a transaction based on the amount transferred, and deposits the revenue earned to the tax bracket's recipient account.
+		
+		:returns: The total accumulated tax from the transaction.
+		
+		:raises BackendException: Raises a backend exception if an error occurs during the database session.
+		"""
+		vat_taxes = (
+			await session.execute(
+				select(Tax)
+				.options(
+					joinedload(Tax.to_account),
+				)
+				.where(
+					Tax.tax_type == TaxType.VAT,
+					Tax.economy_id == economy_id,
+					Tax.affected_type == affected_type,
+				)
+				.order_by(Tax.bracket_start.desc())
+			)
+		).scalars().all()
+
+		total_accum_tax = 0
+
+		for vat_tax in vat_taxes:
+			if amount <= vat_tax.bracket_start:
+				continue
+
+			taxable = min(amount, vat_tax.bracket_end) - vat_tax.bracket_start
+			if taxable > 0:
+				accum_tax = (taxable * vat_tax.rate) // 100
+				vat_tax.to_account.balance += accum_tax
+				total_accum_tax += accum_tax
+
+		return total_accum_tax
+
+	async def perform_tax(self, actor: User, economy: Economy):
+		"""
+		Performs a tax cycle.
+		
+		:param actor: The actor of this action.
+		:param economy: The economy in which the tax brackets are based in.
+		
+		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
+		"""
+		if not await self.has_permission(actor, Permissions.MANAGE_TAX_BRACKETS, economy=economy):
+			raise UnauthorizedException("You do not have the permission to trigger taxes in this economy")
+
+		async with self._sessionmaker.begin() as session:
+			logger.log(LogLevels.Public, f"Economy: {economy.currency_name}\n<@!{actor.id}> triggered a tax cycle")
+
+			wealth_taxes = ( 
+				await session.execute(
+					select(Tax)
+					.where(
+						Tax.economy_id == economy.economy_id,
+						Tax.tax_type == TaxType.WEALTH
+					)
+					.options(joinedload(Tax.to_account))
+					.order_by(Tax.bracket_start.desc())
+				)
+			).scalars()
+
+			wealth_total = 0
+			for wealth_tax in wealth_taxes:
+				full_tax = ((wealth_tax.bracket_end - wealth_tax.bracket_start) * wealth_tax.rate) // 100
+				
+				# This is actually so cool, it's like a switch statement in SQL
+				# https://docs.sqlalchemy.org/en/20/core/sqlelement.html#sqlalchemy.sql.expression.case
+				tax_expr = case(
+					(Account.balance >= wealth_tax.bracket_end, full_tax),
+					(Account.balance > wealth_tax.bracket_start, ((Account.balance - wealth_tax.bracket_start) * wealth_tax.rate) // 100),
+					else_=0
+				)
+
+				stmt = (
+					update(Account)
+					.where(Account.account_type == Tax.affected_type)
+					.values(balance=Account.balance - tax_expr)
+					.returning(tax_expr) # RETURNING clause is supported in basically every dialect EXCEPT mysql, but I don"t think we"ll be using mysql over sqlite/postgres/oracle
+				)
+
+				accum = sum((await session.execute(stmt)).scalars())
+				wealth_tax.to_account.balance += accum
+				wealth_total += accum
+
+			logger.log(LogLevels.Public, f"Economy: {economy.currency_name}\nLevied {frmt(wealth_total)}{economy.currency_unit} in wealth taxes")
+
+			income_taxes = ( 
+				await session.execute(
+					select(Tax)
+					.where(
+						Tax.economy_id == economy.economy_id,
+						Tax.tax_type == TaxType.INCOME
+					)
+					.options(joinedload(Tax.to_account))
+					.order_by(Tax.bracket_start.desc())
+				)
+			).scalars()
+
+			income_total = 0
+			for income_tax in income_taxes:
+				full_tax = ((income_tax.bracket_end - income_tax.bracket_start) * income_tax.rate) // 100
+				
+				tax_expr = case(
+					(Account.balance >= income_tax.bracket_end, full_tax),
+					(Account.balance > income_tax.bracket_start, ((Account.income_to_date - income_tax.bracket_start) * income_tax.rate) // 100),
+					else_=0
+				)
+
+				stmt = (
+					update(Account)
+					.where(Account.account_type == Tax.affected_type)
+					.values(balance=Account.balance - tax_expr)
+					.returning(tax_expr)
+				)
+
+				accum = sum((await session.execute(stmt)).scalars())
+				income_tax.to_account.balance += accum
+				income_total += accum
+
+			logger.log(LogLevels.Public, f"Economy: {economy.currency_name}\nLevied {frmt(income_total)}{economy.currency_unit} in income taxes")
+
+			session.add(Transaction(
+				actor_id = actor.id,
+				action = Actions.PERFORM_TAXES,
+				cud = CUD.UPDATE,
+				economy_id = economy.economy_id
+			))
+
+	# === Permissions ===
+
+	async def _reset_permission(self, user_id: int, permission: Permissions, session: AsyncSession, account: Optional[Account] = None, economy: Optional[Economy] = None):
+		await session.execute(
+			delete(Permission)
+			.where(
+				and_(
+					Permission.permission == permission,
+					Permission.user_id == user_id,
+					or_(
+						Permission.account_id == account.account_id if account else Permission.account_id.is_(None),
+						Permission.economy_id == economy.economy_id if economy else Permission.economy_id.is_(None)
+					)
+				)
+			)
+		)
+		
+	async def _change_permission(self, user_id: int, permission: Permissions, session: AsyncSession, account: Optional[Account] = None, economy: Optional[Economy] = None, allowed: bool = True):
+		if account and not economy:
+			economy = account.economy
+
+		await self._reset_permission(user_id, permission, session, account, economy)
+		session.add(
+			Permission(
+				entry_id = uuid4(),
+				user_id = user_id,
+				permission = permission,
+				account_id = (account.account_id if account is not None else None),
+				economy_id = (economy.economy_id if economy is not None else None),
+				allowed = allowed
+			)
+		)
+
+	async def toggle_ephemeral(self, actor: discord.Member):
+		"""
+		Toggles the ephemeral message attribute for a member.
+		
+		:param actor: The member actor of this action.
+		"""
+		async with self._sessionmaker.begin() as session:
+			await self._change_permission(actor.id, Permissions.USES_EPHEMERAL, session, allowed=not await self.has_permission(actor, Permissions.USES_EPHEMERAL))
+
+	async def reset_permission(self, actor: User, user_id: int, permission: Permissions, account: Optional[Account] = None, economy: Optional[Economy] = None):
+		"""
+		Resets a permission back to its default state.
+		
+		:param actor: The actor of this action.
+		:param user_id: The user ID of the affected user.
+		:param permission: The permission to reset.
+		:param account: (optional) The account constraint of the permission.
+		:param economy: (optional) The economy constraint of the permission.
+		
+		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
+		"""
+		if not await self.has_permission(actor, Permissions.MANAGE_PERMISSIONS, economy=economy):
+			raise UnauthorizedException("You do not have permission to manage permissions here")
+
+		async with self._sessionmaker.begin() as session:
+			await self._reset_permission(user_id, permission, session, account, economy)
+			session.add(
+				Transaction(
+					actor_id = actor.id,
+					economy_id = economy.economy_id if economy is not None else None,
+					target_account_id = account.account_id if account is not None else None,
+					action = Actions.UPDATE_PERMISSIONS,
+					cud = CUD.DELETE,
+					meta = {
+						"affected_id": user_id,
+						"affected_permission": permission
+					}
+				)
+			)
+
+	async def change_permission(self, actor: User, user_id: int, permission: Permissions, account: Optional[Account] = None, economy: Optional[Economy] = None, allowed: bool = True):
+		"""
+		Changes a permission.
+		
+		:param actor: The actor of this action.
+		:param user_id: The user ID of the affected user.
+		:param permission: The permission to change.
+		:param account: (optional) The account constraint of the permission.
+		:param economy: (optional) The economy constraint of the permission.
+		:param allowed: Whether the user is allowed this permission or not. Defaults to True.
+		
+		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
+		"""
+		if not await self.has_permission(actor, Permissions.MANAGE_PERMISSIONS, economy=economy):
+			raise UnauthorizedException("You do not have the permission to manage permissions here")
+
+		async with self._sessionmaker.begin() as session:
+			await self._change_permission(user_id, permission, session, account, economy, allowed)
+			session.add(
+				Transaction(
+					actor_id = actor.id,
+					economy_id = economy.economy_id if economy is not None else None,
+					target_account_id = account.account_id if account is not None else None,
+					action = Actions.UPDATE_PERMISSIONS,
+					cud = CUD.UPDATE,
+					meta = {
+						"affected_id": user_id,
+						"affected_permissions": [permission],
+						"allowed": allowed
+					}
+				)
+			)
+
+	async def change_many_permissions(self, actor: User, user_id: int, permissions: list[Permissions], account: Optional[Account] = None, economy: Optional[Economy] = None, allowed: bool = True):
+		"""
+		Changes many permissions at once.
+		
+		:param actor: The actor of this action.
+		:param user_id: The user ID of the affected user.
+		:param permissions: The list of permissions to change.
+		:param account: (optional) The account constraint of the permission.
+		:param economy: (optional) The economy constraint of the permission.
+		:param allowed: Whether the user is allowed these permissions or not. Defaults to True.
+		
+		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
+		"""
+		if not await self.has_permission(actor, Permissions.MANAGE_PERMISSIONS, economy=economy):
+			raise UnauthorizedException("You do not have permission to manage permissions here")
+
+		async with self._sessionmaker.begin() as session:
+			for permission in permissions:
+				await self._change_permission(user_id, permission, session, account, economy, allowed)
+
+			session.add(
+				Transaction(
+					actor_id = actor.id,
+					economy_id = economy.economy_id if economy is not None else None,
+					target_account_id = account.account_id if account is not None else None,
+					action = Actions.UPDATE_PERMISSIONS,
+					cud = CUD.UPDATE,
+					meta = {
+						"affected_id": user_id,
+						"affected_permissions": permissions,
+						"allowed": allowed
+					}
+				)
+			)
+
+	# === Economies ===
+
+	async def get_economies(self) -> Sequence[Economy]:
+		"""
+		Fetches all economies the bot holds.
+		
+		:returns: A list of economies.
+		"""
+		async with self._sessionmaker() as session:
+			return (await session.execute(select(Economy).options(selectinload(Economy.guilds)))).scalars().all()
+
+	async def get_economy_by_name(self, currency_name: str) -> Optional[Economy]:
+		"""
+		Fetches an economy by its currency name.
+		
+		:param currency_name: The name of the economy's currency.
+		
+		:returns: The economy if it exists, else `None`.
+		"""
+		return await self._one_or_none(select(Economy).where(Economy.currency_name == currency_name).options(selectinload(Economy.guilds)))
+
+	async def get_economy_by_id(self, economy_id: UUID) -> Optional[Economy]:
+		"""
+		Fetches an economy by its UUID.
+		
+		:param economy_id: The economy UUID.
+		
+		:returns: The economy if it exists, else `None`.
+		"""
+		return await self._one_or_none(select(Economy).where(Economy.economy_id == economy_id).options(selectinload(Economy.guilds)))
+
+	async def create_economy(self, actor: discord.Member, currency_name: str, currency_unit: str) -> Economy:
+		"""
+		Creates a new economy tied to a guild.
+	   
+		:param actor: The member actor of this action.
+		:param currency_name: The name of the new economy's currency.
+		:param currency_unit: The unit/symbol of the new economy's currency.
+		
+		:returns: The new economy.
+		
+		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
+		:raises AlreadyExistsException: Raises an already exists exception if an economy already exists with the specified currency name, or the actor's guild is already registered to an economy.
+		"""
+		if not await self.has_permission(actor, Permissions.MANAGE_ECONOMIES):
+			raise UnauthorizedException("You do not have the permission to manage economies")
+		elif await self.get_economy_by_name(currency_name):
+			raise AlreadyExistsException(f"An economy by currency name ({currency_name}) already exists")
+		elif await self.get_guild_economy(actor.guild.id):
+			raise AlreadyExistsException(f"This guild is already registered to an economy")
+
+		async with self._sessionmaker.begin() as session:
+			economy = Economy(
+				economy_id = uuid4(),
+				currency_name = currency_name,
+				currency_unit = currency_unit,
+				owner_guild_id = actor.guild.id
+			)
+
+			session.add(economy)
+			session.add(
+				Guild(
+					guild_id = actor.guild.id,
+					economy = economy.economy_id
+				)
+			)
+			session.add(
+				Transaction(
+					actor_id = actor.id,
+					action = Actions.UPDATE_ECONOMIES,
+					cud = CUD.CREATE,
+					economy_id = economy.economy_id
+				)
+			)
+
+			logger.log(LogLevels.Public, f"<@!{actor.id}> created the economy {currency_name}")
+
+		return economy
+
+	async def delete_economy(self, actor: User, economy: Economy):
+		"""
+		Deletes an economy.
+		
+		:param actor: The actor of this action.
+		:param economy: The economy to be deleted.
+		
+		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
+		"""
+		if not await self.has_permission(actor, Permissions.MANAGE_ECONOMIES):
+			raise UnauthorizedException("You do not have the permission to manage economies")
+
+		async with self._sessionmaker.begin() as session:
+			await session.execute(delete(Guild).where(Guild.economy_id == economy.economy_id))
+			await session.delete(economy)
+			session.add(
+				Transaction(
+					actor_id = actor.id,
+					action = Actions.UPDATE_ECONOMIES,
+					cud = CUD.DELETE,
+					economy_id = economy.economy_id
+				)
+			)
+
+	# === Guilds ===
+
+	async def get_guild_economy(self, guild_id: int) -> Optional[Economy]:
+		"""
+		Fetches the economy of a guild.
+		
+		:param guild_id: The guild's ID.
+		
+		:returns: The economy if it exists, else `None`.
+		"""
+		guild: Optional[Guild] = await self._one_or_none(select(Guild).where(Guild.guild_id == guild_id).options(joinedload(Guild.economy)))
+		return guild.economy if guild else None
+
+	@staticmethod
+	async def get_guild_ids(economy: Economy) -> List[int]:
+		"""
+		Fetches the IDs of all guild members of an economy.
+		
+		:param economy: The economy which holds the guilds.
+		
+		:returns: A list of guild IDs.
+		"""
+		return [guild.guild_id for guild in economy.guilds]
+
+	async def register_guild(self, actor: User, guild_id: int, economy: Economy):
+		"""
+		Registers a guild to an economy.
+		
+		:param actor: The actor of this action.
+		:param guild_id: The guild's ID.
+		:param economy: The economy which will hold the guild.
+		
+		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
+		"""
+		if not await self.has_permission(actor, Permissions.MANAGE_ECONOMIES):
+			raise UnauthorizedException("You do not have the permission to manage economies")
+
+		async with self._sessionmaker.begin() as session:
+			guild = await self._one_or_none(select(Guild).where(Guild.guild_id == guild_id), _session=session)
+			if guild:
+				await session.delete(guild)
+
+			session.add(
+				Guild(
+					guild_id = guild_id,
+					economy_id = economy.economy_id
+				)
+			)
+
+			logger.log(LogLevels.Public, f"<@!{actor.id}> registered the guild with id: {guild_id} to the economy {economy.currency_name}")
+
+	async def unregister_guild(self, actor: User, guild_id: int):
+		"""
+		Unregisters a guild from its economy.
+		
+		:param actor: The actor of this action.
+		:param guild_id: The guild's ID.
+		
+		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
+		:raises AlreadyExistsException: Raises an already exists exception if the guild is the owner of an economy.
+		"""
+		if not await self.has_permission(actor, Permissions.MANAGE_ECONOMIES):
+			raise UnauthorizedException("You do not have the permission to manage economies")
+
+		async with self._sessionmaker.begin() as session:
+			economies = (await session.execute(select(Economy).where(Economy.owner_guild_id == guild_id))).scalars().all()
+
+			if len(economies) > 0:
+				raise AlreadyExistsException("This guild is the owner guild of an economy, it cannot be unregistered")
+
+			guild = await session.get(Guild, guild_id)
+			if guild:
+				await session.delete(guild) 
+				logger.log(LogLevels.Public, f"<@!{actor.id}> unregistered the guild with id {guild_id} from its economy")
+
+	# === Accounts ===
+
+	async def get_user_account(self, user_id: int, economy: Economy) -> Optional[Account]:
+		"""
+		Fetches a user's account.
+		
+		:param user_id: The account owner's user ID.
+		:param economy: The economy in which the account is based in.
+		
+		:returns: The account if it exists, else `None`.
+		"""
+		return await self._one_or_none(
+			select(Account)
+			.where(
+				Account.owner_id == user_id,
+				Account.account_type == AccountType.USER,
+				Account.economy_id == economy.economy_id,
+				Account.deleted == False
+			)
+			.options(joinedload(Account.economy), selectinload(Account.update_notifiers))
+		)
+
+	async def get_account_by_name(self, account_name: str, economy: Economy) -> Optional[Account]:
+		"""
+		Fetches an account by its name.
+		
+		:param account_name: The account name.
+		:param economy: The economy in which the account is based in.
+		
+		:returns: The account if it exists, else `None`.
+		"""
+		return await self._one_or_none(
+			select(Account)
+			.where(
+				Account.account_name == account_name,
+				Account.economy_id == economy.economy_id,
+				Account.deleted == False
+			)
+			.options(joinedload(Account.economy), selectinload(Account.update_notifiers))
+		)
+
+	async def get_account_by_id(self, account_id: UUID) -> Optional[Account]:
+		"""
+		Fetches an account by its ID.
+		:param account_id: The account UUID.
+		:returns: The account if it exists, else `None`.
+		"""
+		return await self._one_or_none(select(Account).where(Account.account_id == account_id).options(joinedload(Account.economy), selectinload(Account.update_notifiers)))
+
+	async def create_account(self, actor: User, owner_id: int, economy: Economy, name: Optional[str] = None, account_type: AccountType = AccountType.USER) -> Account:
+		"""
+		Creates a new account.
+		
+		:param actor: The actor of this action.
+		:param owner_id: The user ID of the new account's owner.
+		:param economy: The economy in which the account is based in.
+		:param name: (optional) The new account's name. Defaults to the owner's mention.
+		:param account_type: The new account's type. Defaults to a user account.
+		
+		:returns: The new account.
+
+		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
+		:raises ValueError: Raises a value error if the name is too long (>64 characters).
+		:raises AlreadyExistsException: Raises an already exists exception if:
+
+		- the specified owner already owns a user account and the new account type is a user account, or
+		- an account by the specified name already exists.
+		"""
+		if not await self.has_permission(actor, Permissions.OPEN_ACCOUNT, economy=economy):
+			raise UnauthorizedException("You do not have the permission to open accounts")
+
+		name = name if name else f"<@!{owner_id}>'s account"
+		if len(name) > 64:
+			raise ValueError("That name is too long")
+		elif account_type == AccountType.USER and owner_id and owner_id == actor.id:
+			if await self.get_user_account(owner_id, economy):
+				raise AlreadyExistsException("You already have a user account")
+		elif not await self.has_permission(actor, Permissions.OPEN_SPECIAL_ACCOUNT, economy=economy):
+			raise UnauthorizedException("You do not have permission to open special accounts")
+		elif name is not None and await self.get_account_by_name(name, economy):
+			raise AlreadyExistsException(f"Account with name {name} already exists")
+
+		async with self._sessionmaker.begin() as session:
+			account = Account(account_id=uuid4(), account_name=name, owner_id=owner_id, account_type=account_type, balance=0, economy=economy)
+			session.add(account)
+			session.add(
+				Transaction(
+					actor_id = actor.id,
+					economy_id = economy.economy_id if economy else None,
+					action = Actions.UPDATE_ACCOUNTS,
+					cud = CUD.CREATE,
+					meta = make_serializable({
+						"account_type": account_type,
+						"owner_id": owner_id
+					})
+				)
+			)
+
+		return account
+
+	async def transfer_ownership(self, actor: User, account: Account, new_owner_id: int) -> Account:
+		"""
+		Transfers the ownership of an account to a new owner.
+		
+		:param actor: The actor of this action.
+		:param account: The account to transfer ownership of.
+		:param owner_id: The user ID of the account's new owner.
+		
+		:returns: The changed account.
+		
+		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
+		"""
+		if not await self.has_permission(actor, Permissions.CLOSE_ACCOUNT, account=account):
+			raise UnauthorizedException("You do not have the permission to transfer the ownership of this account")
+
+		old_owner_id = account.owner_id
+		async with self._sessionmaker.begin() as session:
+			session.add(account)
+
+			account.owner_id = new_owner_id
+
+			session.add(
+				Transaction(
+					actor_id = actor.id,
+					economy_id = account.economy.economy_id,
+					target_account_id = account.account_id,
+					action = Actions.UPDATE_ACCOUNTS,
+					cud = CUD.UPDATE,
+					meta = make_serializable({
+						"old_owner_id": old_owner_id,
+						"new_owner_id": new_owner_id
+					})
+				)
+			)
+
+		return account
+
+	async def delete_account(self, actor: User, account: Account):
+		"""
+		Deletes an account.
+		
+		:param actor: The actor of this action.
+		:param account: The account to delete.
+		
+		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
+		"""
+		if not await self.has_permission(actor, Permissions.CLOSE_ACCOUNT, account=account):
+			raise UnauthorizedException("You do not have the permission to delete this account")
+
+		async with self._sessionmaker.begin() as session:
+			session.add(account)
+
+			account.deleted = True
+
+			session.add(
+				Transaction(
+					actor_id = actor.id,
+					economy_id = account.economy.economy_id,
+					target_account_id = account.account_id,
+					action = Actions.UPDATE_ACCOUNTS,
+					cud = CUD.DELETE
+				)
+			)
+
+	# === Transactions ===
+
+	async def get_transaction_log(self, actor: User, account: Account, limit: Optional[int] = 10) -> Sequence[Transaction]:
+		"""
+		Fetches the transactions of an account.
+		
+		:param actor: The actor of this action.
+		:param account: The account to fetch transactions for.
+		:param limit: (optional) The number of transactions to fetch. Defaults to 10. Set to `None` to fetch all transactions (but be warned that this is an expensive operation).
+		
+		:returns: A list of transactions.
+		
+		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
+		"""
+		if not await self.has_permission(actor, Permissions.VIEW_BALANCE, account=account):
+			raise UnauthorizedException("You do not have the permission to view the transaction log of this account")
+
+		async with self._sessionmaker() as session:
+			return (
+				await session.execute(
+					select(Transaction)
+					.options(
+						load_only(
+							Transaction.transaction_id,
+							Transaction.actor_id,
+							Transaction.target_account_id,
+							Transaction.destination_account_id,
+							Transaction.action,
+							Transaction.amount,
+							Transaction.timestamp
+						),
+						joinedload(Transaction.target_account),
+						joinedload(Transaction.destination_account)
+					)
+					.where(
+						(Transaction.target_account_id == account.account_id) | (Transaction.destination_account_id == account.account_id),
+						Transaction.action == Actions.TRANSFER
+					)
+					.limit(limit)
+					.order_by(Transaction.timestamp.desc())
+				)
+			).scalars().all()
+
+	async def create_reccuring_transfer(self, actor: User, 
+		from_account: Account,
+		to_account: Account,
+		amount: int,
+		payment_interval: int,
+		number_of_payments: Optional[int] = None,
+		transaction_type: TransactionType = TransactionType.INCOME) -> RecurringTransfer:
+		"""
+		Creates a new recurring transfer, which begins transferral from the next payment interval.
+		
+		:param actor: The actor of this action.
+		:param from_account: The account to be transferred from.
+		:param to_account: The account to transfer to.
+		:param amount: The amount to transfer, in cents.
+		:param payment_interval: How often the transfer should occur, in days.
+		:param number_of_payments_left: The number of recurring transfers to occur, defaults to `None` which indicates an infinite recurring transfer granted that the amount to be transferred is available.
+		:param transaction_type: The type of the transaction, defaults to an income transaction.
+		
+		:returns: The new recurring transfer.
+		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
+		"""
+		if not await self.has_permission(actor, Permissions.CREATE_RECURRING_TRANSFERS, account=from_account):
+			raise UnauthorizedException("You do not have the permission to create recurring transfers on this account")
+
+		async with self._sessionmaker.begin() as session:
+			rec_transfer = RecurringTransfer(
+				entry_id = uuid4(),
+				authorisor_id = actor.id,
+				from_account_id=from_account.account_id,
+				to_account_id = to_account.account_id,
+				amount = amount,
+				last_payment_timestamp = time.time(),
+				payment_interval = payment_interval,
+				transaction_type = transaction_type,
+				number_of_payments_left = number_of_payments
+			)
+
+			session.add(rec_transfer)
+
+		return rec_transfer
+
+	async def perform_transaction(self, actor: User, 
+		from_account: Account,
+		to_account: Account,
+		amount: int,
+		transaction_type: TransactionType = TransactionType.INCOME):
+		"""
+		Performs a transaction from one account to another, accounting for tax.
+		
+		:param actor: The actor of this action.
+		:param from_account: The account to be transferred from.
+		:param to_account: The account to transfer to.
+		:param amount: The amount to transfer, in cents.
+		:param transaction_type: The type of the transaction, defaults to an income transaction.
+		
+		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
+		:raises ValueError: Raises a value error if the account transferring has insufficient funds.
+		"""
+		if not await self.has_permission(actor, Permissions.TRANSFER_FUNDS, account=from_account):
+			raise UnauthorizedException("You do not have the permission to transfer funds on this account")
+		elif from_account.economy_id != to_account.economy_id:
+			raise BackendException("Cannot transfer between different economies")
+		elif from_account.balance < amount:
+			raise ValueError("You do not have sufficient funds to transfer from that account")
+		elif from_account.account_id == to_account.account_id:
+			return
+
+		async with self._sessionmaker.begin() as session:
+			from_account = await session.merge(from_account) # make sure the session does not try to pull up the economy when it is already eager loaded
+			to_account = await session.merge(to_account)
+
+			transaction = Transaction(
+				actor_id = actor.id,
+				economy_id = from_account.economy_id,
+				target_account = from_account,
+				destination_account = to_account,
+				action = Actions.TRANSFER,
+				cud = CUD.UPDATE,
+				amount = amount
+			)
+			session.add(transaction)
+
+			if transaction_type == TransactionType.INCOME:
+				to_account.income_to_date += amount
+
+			tax_amount = await self._perform_transaction_tax(amount, from_account.economy_id, from_account.account_type, session)
+			from_account.balance -= amount
+			to_account.balance += (amount - tax_amount)
+
+		log = LogLevels.Private if not await self.has_permission(actor, Permissions.GOVERNMENT_OFFICIAL) else LogLevels.Public
+
+		logger.log(log, f"Economy: {from_account.economy.currency_name}\n<@!{actor.id}> transferred {frmt(amount)} from {from_account.account_name} to {to_account.account_name}. Transaction type: {transaction_type.name.upper()}")
+		await self.notify_users(to_account.get_update_notifiers(), f"<@!{actor.id}> transferred {frmt(amount)} from {from_account.account_name} to {to_account.account_name}, \nit's new balance is {to_account.get_balance()}", "Balance Update")
+		await self.notify_users(from_account.get_update_notifiers(), f"<@!{actor.id}> transferred {frmt(amount)} from an account you watch ({from_account.account_name}), to {to_account.account_name}\n{from_account.account_name}'s new balance is {from_account.get_balance()}", "Balance Update")
+
+	# === Fund management ===
+
+	async def print_funds(self, actor: User, to_account: Account, amount: int):
+		"""
+		Prints funds to an account.
+		
+		:param actor: The actor of this action.
+		:param to_account: The account to print funds to.
+		:param amount: The amount to print, in cents.
+		
+		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
+		"""
+		if not await self.has_permission(actor, Permissions.MANAGE_FUNDS, economy=to_account.economy):
+			raise UnauthorizedException("You do not have the permission to print funds")
+
+		async with self._sessionmaker.begin() as session:
+			session.add(to_account)
+			to_account.balance += amount
+			
+			session.add(
+				Transaction(
+					actor_id = actor.id,
+					economy_id = to_account.economy.economy_id,
+					destination_account_id = to_account.account_id,
+					action = Actions.MANAGE_FUNDS,
+					cud = CUD.CREATE,
+					amount = amount
+				)
+			)
+
+		logger.log(LogLevels.Public, f"Economy: {to_account.economy.currency_name}\n<@!{actor.id}> printed {frmt(amount)} to {to_account.account_name}")
+		await self.notify_users(to_account.get_update_notifiers(), f"<@!{actor.id}> printed {frmt(amount)} to {to_account.account_name},\nit\'s new balance is {to_account.get_balance()}", "Balance Update")
+
+	async def remove_funds(self, actor: User, from_account: Account, amount: int):
+		"""
+		Removes funds from an account.
+		
+		:param actor: The actor of this action.
+		:param to_account: The account to remove funds from.
+		:param amount: The amount to print, in cents.
+		
+		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
+		:raises ValueError: Raises a value error if there are not sufficient funds to remove from the account.
+		"""
+		if not await self.has_permission(actor, Permissions.MANAGE_FUNDS, economy=from_account.economy):
+			raise UnauthorizedException("You do not have the permission to print funds")
+		elif from_account.balance < amount:
+			raise ValueError("There are not sufficient funds in this account to perform this action")
+
+		async with self._sessionmaker.begin() as session:
+			session.add(from_account)
+			from_account.balance -= amount
+
+			session.add(
+				Transaction(
+					actor_id = actor.id,
+					economy_id = from_account.economy.economy_id,
+					destination_account_id = from_account.account_id,
+					action = Actions.MANAGE_FUNDS,
+					cud = CUD.DELETE,
+					amount = amount
+				)
+			)
+
+		logger.log(LogLevels.Public, f"Economy: {from_account.economy.currency_name}\n<@!{actor.id}> removed {frmt(amount)} from {from_account.account_name}")
+		await self.notify_users(from_account.get_update_notifiers(), f"<@!{actor.id}> removed {frmt(amount)} from {from_account.account_name},\nit\'s new balance is {from_account.get_balance()}", "Balance Update")
+
+	# === Notifications ===
+
+	async def _unsubscribe(self, user: User, account: Account, session: AsyncSession):
+		for notifier in account.update_notifiers:
+			if notifier.owner_id == user.id:
+				await session.delete(notifier)
+
+	async def subscribe(self, actor: User, account: Account):
+		"""
+		Subscribes to an account's balance updates.
+		
+		:param actor: The actor of this action.
+		:param account: The account to subscribe to.
+		
+		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
+		"""
+		if not await self.has_permission(actor, Permissions.VIEW_BALANCE, account=account):
+			raise UnauthorizedException("You do not have the permission to subscribe to this account's updates")
+
+		async with self._sessionmaker.begin() as session:
+			await self._unsubscribe(actor, account, session)
+			session.add(
+				BalanceUpdateNotifier(
+					notifier_id = uuid4(),
+					owner_id = actor.id,
+					account_id = account.account_id
+				)
+			)
+
+	async def unsubscribe(self, actor: User, account: Account):
+		"""
+		Unsubscribes from an account's balance updates.
+		
+		:param actor: The actor of this action.
+		:param account: The account to subscribe to.
+		"""
+		async with self._sessionmaker.begin() as session:
+			await self._unsubscribe(actor, account, session)
+
+	async def notify_user(self, user_id: int, message: str, title: str, thumbnail: Optional[str] = None):
+		"""
+		Send a user an embed notification.
+		
+		:param user_id: The user's ID.
+		:param message: The notification message.
+		:param title: The notification title.
+		:param thumbnail: (optional) The thumbnail URL of the notifiaction embed.
+		"""
+		logger.warning(f"Backend failed to message user: {user_id}")
+
+	async def notify_users(self, user_ids: List[int], *args, **kwargs):
+		"""
+		Shorthand for sending notifications to many users in bulk similar to `notify_user`.
+		
+		:param user_id: A list of user IDs.
+		"""
+		print(user_ids)
+		for user_id in user_ids:
+			await self.notify_user(user_id, *args, **kwargs)
+
+	# === Discord parity ===
+
+	async def get_member(self, user_id: int, guild_id: int):
+		raise NotImplementedError()
+
+	async def get_user_dms(self, user_id: int):
+		raise NotImplementedError()
+
+	# === Context manager ===
+
+	async def close(self):
+		"""Dispose of the engine and close session."""
+		await self.engine.dispose()
+
+	async def __aenter__(self):
+		return self
+	
+	async def __aexit__(self, _, exc_v, _____):
+		# If it returns True (or anything that evaluates as truthy) then the system will assume
+		# that the exception has been handled and corrected for, and will not propagate it any further.
+		# If it returns False, None, anything that evaluates as falsy, or nothing at all then the exception will continue to propagate.
+		# https://bbc.github.io/cloudfit-public-docs/asyncio/asyncio-part-3.html
+		try:
+			if isinstance(exc_v, (KeyboardInterrupt, asyncio.CancelledError)):
+				return
+
+			if exc_v:
+				exc = BackendException(exc_v)
+				raise exc from exc_v
+		finally:
+			await self.close()
+
+if __name__ == "__main__":
+	import time
+
+	database_uri = "sqlite+aiosqlite:///database.db"
+	async def main():
+		async with Backend(database_uri, poolclass=AsyncAdaptedQueuePool, echo=True) as backend:
+			stub = StubUser(809875420350119958)
+			stub.roles = [StubUser(1273953959458902129)]
+			start = time.perf_counter()
+
+			econ = await backend.get_economy_by_name("tau")
+			if econ:
+				acc = await backend.get_account_by_name("<@!809875420350119958> 's account", econ)
+				if acc:
+					result = await backend.get_transaction_log(stub, acc)
+					print(f"Result: {result} in {(time.perf_counter() - start) * 1000:.6f}ms")
+
+	asyncio.run(main())
