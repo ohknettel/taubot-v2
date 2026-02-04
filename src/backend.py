@@ -1716,7 +1716,7 @@ class Backend:
 				to_account_id = to_account.account_id,
 				amount = amount,
 				last_payment_timestamp = time.time(),
-				payment_interval = payment_interval,
+				payment_interval = payment_interval * DAY_TO_SECOND,
 				transaction_type = transaction_type,
 				number_of_payments_left = number_of_payments
 			)
@@ -1724,6 +1724,38 @@ class Backend:
 			session.add(rec_transfer)
 
 		return rec_transfer
+
+	async def _perform_transaction(self, actor: User,
+		from_account: Account,
+		to_account: Account,
+		amount: int,
+		session: AsyncSession,
+		transaction_type: TransactionType = TransactionType.INCOME):
+		if from_account not in session:
+			session.add(from_account)
+		if to_account not in session:
+			session.add(to_account)
+
+		transaction = Transaction(
+			actor_id = actor.id,
+			economy_id = from_account.economy_id,
+			target_account = from_account,
+			destination_account = to_account,
+			action = Actions.TRANSFER,
+			cud = CUD.UPDATE,
+			amount = amount
+		)
+		session.add(transaction)
+
+		if transaction_type == TransactionType.INCOME:
+			to_account.income_to_date += amount
+
+		tax_amount = await self._perform_transaction_tax(amount, from_account.economy_id, from_account.account_type, session)
+		from_account.balance -= amount
+		to_account.balance += (amount - tax_amount)
+
+		await session.refresh(from_account, ["economy", "update_notifiers"])
+		await session.refresh(to_account, ["economy", "update_notifiers"])
 
 	async def perform_transaction(self, actor: User, 
 		from_account: Account,
