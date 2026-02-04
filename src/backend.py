@@ -197,7 +197,7 @@ class Account(Base):
 		
 		:returns: A list of the user IDs of the update notifiers of the account.
 		"""
-		return [i.owner_id for i in self.update_notifiers] + [self.owner_id,]
+		return [i.owner_id for i in self.update_notifiers] + ([self.owner_id,] if self.owner_id else [])
 
 	def get_balance(self) -> str:
 		"""
