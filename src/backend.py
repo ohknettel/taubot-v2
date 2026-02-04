@@ -593,58 +593,58 @@ class Backend:
 		elif account and not economy:
 			economy = await self.get_economy_by_id(account.economy_id)
 		
-		stmt = select(Permission) \
-			  .where(
-				and_(
-					Permission.permission == permission,
-					Permission.user_id.in_([user.id] + _get_roles(user)),
-					or_(
-						Permission.account_id == account.account_id if account else Permission.account_id.is_(None),
-						Permission.economy_id == economy.economy_id if economy else Permission.economy_id.is_(None)
-					)
-				)
-			  ) \
-			  .distinct()
-
-		default = False
-		owner_id = account.owner_id if account is not None else None
-
-		if permission in DEFAULT_GLOBAL_PERMISSIONS or (permission in DEFAULT_OWNER_PERMISSIONS \
-														and owner_id in [user.id] + _get_roles(user)):
-			default = True
-
 		async with self._sessionmaker() as session:
+			stmt = select(Permission) \
+				  .where(
+					and_(
+						Permission.permission == permission,
+						Permission.user_id.in_([user.id] + _get_roles(user)),
+						or_(
+							Permission.account_id == account.account_id if account else Permission.account_id.is_(None),
+							Permission.economy_id == economy.economy_id if economy else Permission.economy_id.is_(None)
+						)
+					)
+				  ) \
+				  .distinct()
+
+			default = False
+			owner_id = account.owner_id if account is not None else None
+
+			if permission in DEFAULT_GLOBAL_PERMISSIONS or (permission in DEFAULT_OWNER_PERMISSIONS \
+															and owner_id in [user.id] + _get_roles(user)):
+				default = True
+
 			results = list((await session.execute(stmt)).scalars().all())
 
 			if len(results) == 0:
 				return default
 
-			def _evaluate(perm: Permission):
-				# Precedence for result: 
-				# 1. Account & economy are null
-				# 2. Account is null
-				# 3. Account & economy are not null, user
-				# 4. Account & economy are not null, role
-				# Economy cannot be null without account being null
-				if perm.account_id is None and perm.economy_id is None:
-					return 1
-				elif perm.account_id is None:
-					return 2
-				return 3 if perm.user_id == user.id else 4
+		def _evaluate(perm: Permission):
+			# Precedence for result: 
+			# 1. Account & economy are null
+			# 2. Account is null
+			# 3. Account & economy are not null, user
+			# 4. Account & economy are not null, role
+			# Economy cannot be null without account being null
+			if perm.account_id is None and perm.economy_id is None:
+				return 1
+			elif perm.account_id is None:
+				return 2
+			return 3 if perm.user_id == user.id else 4
 
-			# global permissions (economy = null) > economy permissions (account = null) > user permissions > role permissions
-			best = results.pop(0)
-			for r in results:
-				eval_r = _evaluate(r)
-				eval_best = _evaluate(best)
+		# global permissions (economy = null) > economy permissions (account = null) > user permissions > role permissions
+		best = results.pop(0)
+		for r in results:
+			eval_r = _evaluate(r)
+			eval_best = _evaluate(best)
 
-				if eval_r < eval_best:
+			if eval_r < eval_best:
+				best = r
+			elif eval_r == eval_best and isinstance(user, discord.Member):
+				r_b = user.guild.get_role(best.user_id)
+				r_r = user.guild.get_role(r.user_id)
+				if r_r and r_b and r_b < r_r:
 					best = r
-				elif eval_r == eval_best and isinstance(user, discord.Member):
-					r_b = user.guild.get_role(best.user_id)
-					r_r = user.guild.get_role(r.user_id)
-					if r_r and r_b and r_b < r_r:
-						best = r
 		
 		return best.allowed
 
@@ -704,21 +704,21 @@ class Backend:
 		if not await self.has_permission(actor, Permissions.MANAGE_ECONOMIES, economy=economy):
 			raise UnauthorizedException(f"You do not have permission to create applications in this economy")
 
-		app = Application(
-			application_id = uuid4(),
-			application_name = name,
-			owner_id = owner_id,
-			economy_id = economy.economy_id
-		  )
-
 		async with self._sessionmaker.begin() as session:
+			app = Application(
+				application_id = uuid4(),
+				application_name = name,
+				owner_id = owner_id,
+				economy = economy
+			)
+
 			session.add(app)
 			session.add(
 				Transaction(
-					actor_id=actor.id, 
-					action=Actions.UPDATE_ECONOMIES, 
-					cud=CUD.CREATE,
-					meta={
+					actor_id = actor.id, 
+					action = Actions.UPDATE_ECONOMIES, 
+					cud = CUD.CREATE,
+					meta = {
 						"type": "APPLICATION",
 						"application_id": app.application_id,
 						"application_owner": owner_id
@@ -749,10 +749,10 @@ class Backend:
 		async with self._sessionmaker.begin() as session:
 			session.add(
 				Transaction(
-					actor_id=actor.id, 
-					action=Actions.UPDATE_ECONOMIES, 
-					cud=CUD.DELETE, 
-					meta={
+					actor_id = actor.id, 
+					action = Actions.UPDATE_ECONOMIES, 
+					cud = CUD.DELETE, 
+					meta = {
 						"type": "APPLICATION",
 						"application_id": application.application_id,
 						"application_owner": application.owner_id
@@ -812,12 +812,13 @@ class Backend:
 			new_key = APIKey(application=app, internal_app_id=ref_id, issuer_id=issuer_id)
 
 			session.add(new_key)
+
 			session.add(
 				Transaction(
-					actor_id=issuer_id, 
-					action=Actions.UPDATE_ECONOMIES, 
-					cud=CUD.CREATE, 
-					meta={
+					actor_id = issuer_id, 
+					action = Actions.UPDATE_ECONOMIES, 
+					cud = CUD.CREATE, 
+					meta = {
 						"type": "API_KEY",
 						"application_id": app.application_id,
 						"ref_id": ref_id
@@ -842,10 +843,10 @@ class Backend:
 		async with self._sessionmaker.begin() as session:
 			session.add(
 				Transaction(
-					actor_id=actor.id, 
-					action=Actions.UPDATE_ECONOMIES, 
-					cud=CUD.DELETE, 
-					meta={
+					actor_id = actor.id, 
+					action = Actions.UPDATE_ECONOMIES, 
+					cud = CUD.DELETE, 
+					meta = {
 						"type": "API_KEY",
 						"application_id": key.application.application_id,
 						"ref_id": key.internal_app_id
@@ -1328,12 +1329,15 @@ class Backend:
 			)
 
 			session.add(economy)
-			session.add(
-				Guild(
-					guild_id = actor.guild.id,
-					economy = economy.economy_id
+
+			if getattr(actor, "guild"): # discord.Object and backend.StubUser safeguard
+				session.add(
+					Guild(
+						guild_id = actor.guild.id,
+						economy = economy
+					)
 				)
-			)
+
 			session.add(
 				Transaction(
 					actor_id = actor.id,
@@ -1797,26 +1801,7 @@ class Backend:
 			return
 
 		async with self._sessionmaker.begin() as session:
-			from_account = await session.merge(from_account) # make sure the session does not try to pull up the economy when it is already eager loaded
-			to_account = await session.merge(to_account)
-
-			transaction = Transaction(
-				actor_id = actor.id,
-				economy_id = from_account.economy_id,
-				target_account = from_account,
-				destination_account = to_account,
-				action = Actions.TRANSFER,
-				cud = CUD.UPDATE,
-				amount = amount
-			)
-			session.add(transaction)
-
-			if transaction_type == TransactionType.INCOME:
-				to_account.income_to_date += amount
-
-			tax_amount = await self._perform_transaction_tax(amount, from_account.economy_id, from_account.account_type, session)
-			from_account.balance -= amount
-			to_account.balance += (amount - tax_amount)
+			await self._perform_transaction(actor, from_account, to_account, amount, session, transaction_type)
 
 		log = LogLevels.Private if not await self.has_permission(actor, Permissions.GOVERNMENT_OFFICIAL) else LogLevels.Public
 
@@ -1839,20 +1824,27 @@ class Backend:
 		if not await self.has_permission(actor, Permissions.MANAGE_FUNDS, economy=to_account.economy):
 			raise UnauthorizedException("You do not have the permission to print funds")
 
-		async with self._sessionmaker.begin() as session:
-			session.add(to_account)
-			to_account.balance += amount
-			
-			session.add(
-				Transaction(
-					actor_id = actor.id,
-					economy_id = to_account.economy.economy_id,
-					destination_account_id = to_account.account_id,
-					action = Actions.MANAGE_FUNDS,
-					cud = CUD.CREATE,
-					amount = amount
+		async with self._sessionmaker() as session:
+			async with session.begin():
+				to_account.balance += amount
+				
+				session.add(
+					Transaction(
+						actor_id = actor.id,
+						economy_id = to_account.economy.economy_id,
+						destination_account_id = to_account.account_id,
+						action = Actions.MANAGE_FUNDS,
+						cud = CUD.CREATE,
+						amount = amount
+					)
 				)
-			)
+
+			if to_account not in session:
+				session.add(to_account)
+			else:
+				await session.refresh(to_account)
+
+			await session.commit()
 
 		logger.log(LogLevels.Public, f"Economy: {to_account.economy.currency_name}\n<@!{actor.id}> printed {frmt(amount)} to {to_account.account_name}")
 		await self.notify_users(to_account.get_update_notifiers(), f"<@!{actor.id}> printed {frmt(amount)} to {to_account.account_name},\nit\'s new balance is {to_account.get_balance()}", "Balance Update")
