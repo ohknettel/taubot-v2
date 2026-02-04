@@ -515,7 +515,7 @@ class Backend:
 				.where(Permission.user_id.in_([user.id] + _get_roles(user)))
 				
 		if economy:
-			stmt = stmt.where(Permission.economy_id == economy.economy_id).options(joinedload(Permission.economy_id))
+			stmt = stmt.where(Permission.economy_id == economy.economy_id)
 
 		async with self._sessionmaker() as session:
 			return (
@@ -1397,7 +1397,7 @@ class Backend:
 			raise UnauthorizedException("You do not have the permission to manage economies")
 
 		async with self._sessionmaker.begin() as session:
-			guild = await self._one_or_none(select(Guild).where(Guild.guild_id == guild_id), _session=session)
+			guild = await self._one_or_none(select(Guild).where(Guild.guild_id == guild_id), session=session)
 			if guild:
 				await session.delete(guild)
 
@@ -1517,7 +1517,7 @@ class Backend:
 			raise AlreadyExistsException(f"Account with name {name} already exists")
 
 		async with self._sessionmaker.begin() as session:
-			account = Account(account_id=uuid4(), account_name=name, owner_id=owner_id, account_type=account_type, balance=0, economy=economy)
+			account = Account(account_id=uuid4(), account_name=name, owner_id=owner_id, account_type=account_type, balance=0, economy=economy, update_notifiers=[])
 			session.add(account)
 			session.add(
 				Transaction(
@@ -1573,7 +1573,7 @@ class Backend:
 
 	async def delete_account(self, actor: User, account: Account):
 		"""
-		Deletes an account.
+		Marks an account as deleted.
 		
 		:param actor: The actor of this action.
 		:param account: The account to delete.
@@ -1660,6 +1660,7 @@ class Backend:
 		:param transaction_type: The type of the transaction, defaults to an income transaction.
 		
 		:returns: The new recurring transfer.
+
 		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
 		"""
 		if not await self.has_permission(actor, Permissions.CREATE_RECURRING_TRANSFERS, account=from_account):
@@ -1776,7 +1777,7 @@ class Backend:
 		:param actor: The actor of this action.
 		:param to_account: The account to remove funds from.
 		:param amount: The amount to print, in cents.
-		
+
 		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
 		:raises ValueError: Raises a value error if there are not sufficient funds to remove from the account.
 		"""
@@ -1859,7 +1860,6 @@ class Backend:
 		
 		:param user_id: A list of user IDs.
 		"""
-		print(user_ids)
 		for user_id in user_ids:
 			await self.notify_user(user_id, *args, **kwargs)
 
