@@ -1550,20 +1550,21 @@ class Backend:
 
 		return account
 
-	async def transfer_ownership(self, actor: User, account: Account, new_owner_id: int) -> Account:
+	async def transfer_ownership(self, actor: User, account: Account, new_owner_id: int):
 		"""
 		Transfers the ownership of an account to a new owner.
 		
 		:param actor: The actor of this action.
 		:param account: The account to transfer ownership of.
 		:param owner_id: The user ID of the account's new owner.
-		
-		:returns: The changed account.
-		
+				
 		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
+		:raises ValueError: Raises a value error if a user account is transferred.
 		"""
 		if not await self.has_permission(actor, Permissions.CLOSE_ACCOUNT, account=account):
 			raise UnauthorizedException("You do not have the permission to transfer the ownership of this account")
+		elif account.account_type == AccountType.USER:
+			raise ValueError("Cannot transfer user accounts, transfer balances instead")
 
 		old_owner_id = account.owner_id
 		async with self._sessionmaker.begin() as session:
