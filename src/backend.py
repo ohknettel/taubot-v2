@@ -1569,7 +1569,49 @@ class Backend:
 				)
 			)
 
-		return account
+			if account not in session:
+				session.add(account)
+			else:
+				await session.refresh(account)
+
+	async def rename_account(self, actor: User, account: Account, new_name: str):
+		"""
+		Renames an account.
+		
+		:param actor: The actor of this action.
+		:param account: The account to be renamed.
+		:param new_name: The new name of the account.
+
+		:raises UnauthorizedException: Raises an unauthorized exception if the actor is not the account owner nor has the permission to rename the account.
+		:raises ValueError: Raises a value error if a user account is provided.
+		"""
+		if not (await self.has_permission(actor, Permissions.CLOSE_ACCOUNT, account=account) or (account.owner_id and actor.id == account.owner_id)):
+			raise UnauthorizedException("You do not have the permission to rename this account")
+		elif account.account_type == AccountType.USER:
+			raise UnauthorizedException("Cannot rename user accounts")
+
+		async with self._sessionmaker.begin() as session:
+			old_name = account.account_name
+			account.account_name = new_name
+
+			session.add(
+				Transaction(
+					actor_id = actor.id,
+					economy_id = account.economy.economy_id,
+					target_account_id = account.account_id,
+					action = Actions.UPDATE_ACCOUNTS,
+					cud = CUD.UPDATE,
+					meta = make_serializable({
+						"old_account_name": old_name,
+						"new_account_name": new_name
+					})
+				)
+			)
+
+			if account not in session:
+				session.add(account)
+			else:
+				await session.refresh(account)
 
 	async def delete_account(self, actor: User, account: Account):
 		"""
