@@ -111,7 +111,7 @@ class Economy(Base):
 	currency_name: Mapped[str] = mapped_column(String(32), unique=True)
 	currency_unit: Mapped[str] = mapped_column(String(32))
 
-	guilds: Mapped[List["Guild"]] = relationship(back_populates="economy")
+	guilds: Mapped[List["Guild"]] = relationship(back_populates="economy", cascade="delete-orphan", passive_deletes=True)
 	accounts: Mapped[List["Account"]] = relationship(back_populates="economy")
 	applications: Mapped[List["Application"]] = relationship(back_populates="economy")
 
