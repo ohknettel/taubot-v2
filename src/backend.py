@@ -443,15 +443,15 @@ class Backend:
 		async with self.engine.begin() as conn:
 			await conn.run_sync(Base.metadata.create_all)
 
-	async def _one_or_none(self, stmt, *, _session: Optional[AsyncSession] = None):
+	async def _one_or_none(self, stmt, *, session: Optional[AsyncSession] = None):
 		"""
 		Returns one or None as a result of the statement.
 		
 		:param stmt: Statement to execute.
 		:param session: (optional) Session to batch execute.
 		"""
-		if _session:
-			return (await _session.execute(stmt)).scalar_one_or_none()
+		if session:
+			return (await session.execute(stmt)).scalar_one_or_none()
 		else:
 			async with self._sessionmaker() as session:
 				return (await session.execute(stmt)).scalar_one_or_none()
