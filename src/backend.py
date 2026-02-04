@@ -1902,9 +1902,10 @@ class Backend:
 		await self.engine.dispose()
 
 	async def __aenter__(self):
+		await self.initalize() # ENSURE tables are created
 		return self
 	
-	async def __aexit__(self, _, exc_v, _____):
+	async def __aexit__(self, exc_type, exc_v, _____):
 		# If it returns True (or anything that evaluates as truthy) then the system will assume
 		# that the exception has been handled and corrected for, and will not propagate it any further.
 		# If it returns False, None, anything that evaluates as falsy, or nothing at all then the exception will continue to propagate.
@@ -1914,8 +1915,12 @@ class Backend:
 				return
 
 			if exc_v:
-				exc = BackendException(exc_v)
-				raise exc from exc_v
+				print(exc_type)
+				if issubclass(exc_type, BackendException):
+					raise exc_v
+				else:
+					exc = BackendException(exc_v)
+					raise exc from exc_v
 		finally:
 			await self.close()
 
