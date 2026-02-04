@@ -424,26 +424,22 @@ class Backend:
 		:param path: A path or database URI to the database.
 		:param engine_options: Dialect-dependent engine options.
 		"""
-		# try to get the running loop first because the engine functions are async and these are all sync
-		try:
-			self.loop = asyncio.get_running_loop()
-		except RuntimeError:
-			self.loop = None
-
 		self.engine = create_async_engine(path, **engine_options)
 		
 		# apparently sessions are meant to be short-lived, oops
 		self._sessionmaker = async_sessionmaker(self.engine, expire_on_commit=False)
-		
-		# we don't want this to conflict with discord.py's loop or aiohttp's because we cannot have 2 loops
-		if self.loop and self.loop.is_running():
-			self.loop.create_task(self._init_base())
-		else:
-			self.loop = asyncio.new_event_loop()
-			asyncio.set_event_loop(self.loop)
-			self.loop.run_until_complete(self._init_base())
 
-	async def _init_base(self):
+	async def initalize(self):
+		"""
+		Initalizes the backend by creating the necessary tables for models.
+
+		.. note
+		This function is automatically called if you use the backend as an async context manager as shown below:
+		
+		.. code-block:: python
+		async with Backend(...) as backend:
+			...
+		"""
 		async with self.engine.begin() as conn:
 			await conn.run_sync(Base.metadata.create_all)
 
