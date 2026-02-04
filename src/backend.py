@@ -1,4 +1,4 @@
-from sqlalchemy import INT, JSON, AsyncAdaptedQueuePool, BigInteger, DateTime, ForeignKey, String, delete, or_, and_, select, update, case
+from sqlalchemy import INT, JSON, AsyncAdaptedQueuePool, BigInteger, DateTime, ForeignKey, String, delete, func, or_, and_, select, true, update, case
 from sqlalchemy.orm import DeclarativeBase, Mapped, joinedload, load_only, mapped_column, relationship, selectinload
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from datetime import datetime
@@ -913,9 +913,20 @@ class Backend:
 			"to_account_id": to_account.account_id,
 			"economy_id": to_account.economy.economy_id
 		}
-		tax_bracket = Tax(**kwargs)
 
 		async with self._sessionmaker.begin() as session:
+			tax_bracket = Tax(
+				entry_id = uuid4(),
+				tax_name = tax_name,
+				affected_type = affected_type,
+				tax_type = tax_type,
+				bracket_start = bracket_start,
+				bracket_end = bracket_end,
+				rate = rate,
+				to_account = to_account,
+				economy = to_account.economy
+			)
+
 			session.add(tax_bracket)
 			session.add(
 				Transaction(
@@ -970,14 +981,12 @@ class Backend:
 		Performs all transaction taxes (VAT) of an economy on a transaction based on the amount transferred, and deposits the revenue earned to the tax bracket's recipient account.
 		
 		:returns: The total accumulated tax from the transaction.
-		
-		:raises BackendException: Raises a backend exception if an error occurs during the database session.
 		"""
 		vat_taxes = (
 			await session.execute(
 				select(Tax)
 				.options(
-					joinedload(Tax.to_account),
+					joinedload(Tax.to_account).load_only(Account.account_id),
 				)
 				.where(
 					Tax.tax_type == TaxType.VAT,
@@ -986,21 +995,22 @@ class Backend:
 				)
 				.order_by(Tax.bracket_start.desc())
 			)
-		).scalars().all()
+		).scalars().unique().all()
 
-		total_accum_tax = 0
+		total_accum = 0
 
 		for vat_tax in vat_taxes:
 			if amount <= vat_tax.bracket_start:
 				continue
 
-			taxable = min(amount, vat_tax.bracket_end) - vat_tax.bracket_start
-			if taxable > 0:
-				accum_tax = (taxable * vat_tax.rate) // 100
-				vat_tax.to_account.balance += accum_tax
-				total_accum_tax += accum_tax
+			taxable = (min(amount, vat_tax.bracket_end) if vat_tax.bracket_end else amount) - vat_tax.bracket_start
 
-		return total_accum_tax
+			if taxable > 0:
+				accum = (taxable * vat_tax.rate) // 100
+				await session.execute(update(Account).where(Account.account_id == vat_tax.to_account_id).values(balance=Account.balance + accum))
+				total_accum += accum
+
+		return total_accum
 
 	async def perform_tax(self, actor: User, economy: Economy):
 		"""
@@ -1022,7 +1032,7 @@ class Backend:
 					select(Tax)
 					.where(
 						Tax.economy_id == economy.economy_id,
-						Tax.tax_type == TaxType.WEALTH
+						Tax.tax_type.in_([TaxType.WEALTH_FLAT, TaxType.WEALTH_MARGINAL])
 					)
 					.options(joinedload(Tax.to_account))
 					.order_by(Tax.bracket_start.desc())
@@ -1031,24 +1041,38 @@ class Backend:
 
 			wealth_total = 0
 			for wealth_tax in wealth_taxes:
-				full_tax = ((wealth_tax.bracket_end - wealth_tax.bracket_start) * wealth_tax.rate) // 100
-				
 				# This is actually so cool, it's like a switch statement in SQL
 				# https://docs.sqlalchemy.org/en/20/core/sqlelement.html#sqlalchemy.sql.expression.case
-				tax_expr = case(
-					(Account.balance >= wealth_tax.bracket_end, full_tax),
-					(Account.balance > wealth_tax.bracket_start, ((Account.balance - wealth_tax.bracket_start) * wealth_tax.rate) // 100),
-					else_=0
-				)
+				if wealth_tax.tax_type == TaxType.WEALTH_FLAT:
+					tax_expr = case(
+						(
+							and_(Account.balance > wealth_tax.bracket_start, Account.balance <= wealth_tax.bracket_end if wealth_tax.bracket_end else true()),
+							(Account.balance * wealth_tax.rate) // 100
+						),
+						else_=0
+					)
+				else:
+					tax_expr = case(
+						(
+							and_(Account.balance > wealth_tax.bracket_start, Account.balance <= wealth_tax.bracket_end if wealth_tax.bracket_end else true()),
+							((Account.balance - wealth_tax.bracket_start) * wealth_tax.rate) // 100
+						),
+						else_=0
+					)
 
-				stmt = (
+				accum: int = (
+					await session.execute(
+						select(func.sum(tax_expr.distinct()))
+						.where(Account.account_type == Tax.affected_type, Account.deleted == False)
+					)
+				).scalar_one()
+
+				await session.execute(
 					update(Account)
-					.where(Account.account_type == Tax.affected_type)
+					.where(Account.account_type == Tax.affected_type, Account.deleted == False)
 					.values(balance=Account.balance - tax_expr)
-					.returning(tax_expr) # RETURNING clause is supported in basically every dialect EXCEPT mysql, but I don"t think we"ll be using mysql over sqlite/postgres/oracle
 				)
 
-				accum = sum((await session.execute(stmt)).scalars())
 				wealth_tax.to_account.balance += accum
 				wealth_total += accum
 
@@ -1061,29 +1085,33 @@ class Backend:
 						Tax.economy_id == economy.economy_id,
 						Tax.tax_type == TaxType.INCOME
 					)
-					.options(joinedload(Tax.to_account))
+					.options(joinedload(Tax.to_account).load_only(Account.account_id))
 					.order_by(Tax.bracket_start.desc())
 				)
 			).scalars()
 
 			income_total = 0
-			for income_tax in income_taxes:
-				full_tax = ((income_tax.bracket_end - income_tax.bracket_start) * income_tax.rate) // 100
-				
+			for income_tax in income_taxes:				
 				tax_expr = case(
-					(Account.balance >= income_tax.bracket_end, full_tax),
-					(Account.balance > income_tax.bracket_start, ((Account.income_to_date - income_tax.bracket_start) * income_tax.rate) // 100),
+					(and_(Account.balance > income_tax.bracket_start, Account.balance <= income_tax.bracket_end if income_tax.bracket_end else true()),
+						((Account.balance - income_tax.bracket_start) * income_tax.rate) // 100
+					),
 					else_=0
 				)
 
-				stmt = (
+				accum: int = (
+					await session.execute(
+						select(func.sum(tax_expr.distinct()))
+						.where(Account.account_type == Tax.affected_type, Account.deleted == False)
+					)
+				).scalar_one()
+
+				await session.execute(
 					update(Account)
-					.where(Account.account_type == Tax.affected_type)
+					.where(Account.account_type == Tax.affected_type, Account.deleted == False)
 					.values(balance=Account.balance - tax_expr)
-					.returning(tax_expr)
 				)
 
-				accum = sum((await session.execute(stmt)).scalars())
 				income_tax.to_account.balance += accum
 				income_total += accum
 
