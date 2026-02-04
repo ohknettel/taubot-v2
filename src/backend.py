@@ -36,15 +36,31 @@ class Base(DeclarativeBase):
 
 # ========== IntEnums ==========
 
+class LogLevels(IntEnum):
+	"""Enum used to represent the differnet possible log record levels"""
+	Private = 51
+	Public = 52
+
 class AccountType(IntEnum):
 	"""Enum used to represent the different possible account types."""
 	USER = 0
 	GOVERNMENT = 1
 	CORPORATION = 2
 	CHARITY = 3
+	FINANCIAL = 4
 
 class Permissions(IntEnum):
-	"""Enum used to represent the different permissions."""
+	"""
+	Enum used to represent the different permissions.
+	
+	Permissions are ranked in the following order from top to bottom:
+
+	1. Permissions assigned to the user globally (in all economies)
+	2. Permissions assigned to the user for a specific economy
+	3. Permissions assigned to the user directly
+	4. Permissions assigned to the user through a role
+	"""
+
 	# User
 	OPEN_ACCOUNT = 0
 	VIEW_BALANCE = 1
@@ -325,6 +341,7 @@ class AlreadyExistsException(BackendException):
 	pass
 
 class ValueError(BackendException, ValueError):
+	"""The backend exception raised when an object's field has an incorrect or insufficient value."""
 	pass
 
 class HasID(Protocol):
@@ -863,7 +880,7 @@ class Backend:
 				)
 			).scalars().all()
 
-	async def create_tax_bracket(self, actor: User, tax_name: str, affected_type: AccountType, tax_type: TaxType, bracket_start: int, bracket_end: int, rate: int, to_account: Account) -> Tax:
+	async def create_tax_bracket(self, actor: User, tax_name: str, affected_type: AccountType, tax_type: TaxType, bracket_start: int, bracket_end: Optional[int], rate: int, to_account: Account) -> Tax:
 		"""
 		Creates a new tax bracket.
 		
@@ -872,7 +889,7 @@ class Backend:
 		:param affected_type: The account type affected by this tax bracket.
 		:param tax_type: The type of the new tax bracket.
 		:param bracket_start: The starting balance amount for the tax bracket to apply.
-		:param bracket_end: The final balance amount in which this tax bracket can apply.
+		:param bracket_end: The final balance amount in which this tax bracket can apply, set to `None` for no ending limit.
 		:param rate: The percentage rate of the new tax bracket.
 		:param to_account: The account where tax revenue will be collected.
 		:returns: The new tax bracket.
@@ -925,12 +942,11 @@ class Backend:
 	
 		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
 		:raises NotFoundException: Raises a not found exception if the specified tax bracket does not exist.
-		:raises BackendException: Raises a backend exception if an error occurs during the database session.
 		"""
 		if not await self.has_permission(actor, Permissions.MANAGE_TAX_BRACKETS, economy=economy):
 			raise UnauthorizedException("You do not have the permission to manage tax brackets in this economy")
 		elif not (tax_bracket := await self.get_tax_bracket(tax_name, economy)):
-			raise NotFoundException("A tax bracket of that name does not exists in this economy")
+			raise NotFoundException(f"Tax bracket ({tax_name}) does not exist in this economy")
 
 		async with self._sessionmaker.begin() as session:
 			await session.delete(tax_bracket)
@@ -1831,10 +1847,25 @@ class Backend:
 	# === Discord parity ===
 
 	async def get_member(self, user_id: int, guild_id: int):
-		raise NotImplementedError()
+		"""
+		Fetches a Discord member by their ID, in addition to their guild ID.
+
+		:param user_id: The member's user ID.
+		:param guild_id: The member's guild ID.
+
+		:returns: The member if it exists, else `None`.
+		"""
+		pass
 
 	async def get_user_dms(self, user_id: int):
-		raise NotImplementedError()
+		"""
+		Fetches a Discord member's private mesasge channel.
+
+		:param user_id: The member's user ID.
+
+		:returns: The channel if it exists, else `None`.
+		"""
+		pass
 
 	# === Context manager ===
 
