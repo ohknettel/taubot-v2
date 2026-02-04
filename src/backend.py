@@ -486,6 +486,7 @@ class Backend:
 					)
 					.where(transfer_time <= tick_time)
 					.order_by(transfer_time.asc())
+					.distinct()
 				)
 			).scalars().all()
 
@@ -494,13 +495,13 @@ class Backend:
 				payments_left = transfer.number_of_payments_left
 				
 				for _ in range(number_of_transfers):
-					if payments_left == 0:
+					if payments_left is not None and payments_left == 0:
 						await session.delete(transfer)
 						break
 
 					try:
 						authorisor = await self.get_member(transfer.authorisor_id, transfer.from_account.economy.owner_guild_id) or StubUser(transfer.authorisor_id)
-						await self.perform_transaction(authorisor, transfer.from_account, transfer.to_account, transfer.amount, transfer.transaction_type)
+						await self._perform_transaction(authorisor, transfer.from_account, transfer.to_account, transfer.amount, session, transfer.transaction_type)
 						if payments_left and payments_left > 0:
 							payments_left -= 1
 					except Exception as e:
