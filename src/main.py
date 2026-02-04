@@ -212,22 +212,21 @@ class Taubot(commands.Bot):
 
         self.tick.start()
 
-    async def get_account(self, member: discord.Member) -> Optional[bknd.Account]:
+    async def get_account(self, user_id: int, economy: bknd.Economy) -> Optional[bknd.Account]:
         """
         Fetches a member's currenty logged in account, or the account the member owns if they are not logged in.
 
-        :param member: The member.
+        :param user_id: The member's ID.
+        :param economy: The guild economy
 
         :returns: The account if it exists, else `None`.
         """
-        if (economy := await self.backend.get_guild_economy(member.guild.id)):
-            account = login_map.get(member.id)
-            if not account:
-                account = await self.backend.get_user_account(member.id, economy)
+        account = login_map.get(user_id)
+        if not account:
+            return await self.backend.get_user_account(user_id, economy)
 
-            return account
-
-        return None
+        await self.backend.refresh(account)
+        return account
 
     async def get_account_by_name(self, name: str, economy: bknd.Economy) -> Optional[bknd.Account]:
         """
@@ -326,14 +325,11 @@ class CommandsCog(commands.Cog):
     def __init__(self, bot: Taubot):
         self.bot = bot
         self.backend = self.bot.backend
-        self.bot.tree.error(self.__dispatch_to_app_command_handler)
+        self.bot.tree.error(self.on_app_command_error)
 
     @commands.Cog.listener()
     async def on_ready(self):
         logger.info(f"Logged in as {self.bot.user}")
-
-    async def __dispatch_to_app_command_handler(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
-        self.bot.dispatch("app_command_error", interaction, error)
 
     @commands.Cog.listener("on_app_command_error")
     async def on_app_command_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
@@ -345,13 +341,12 @@ class CommandsCog(commands.Cog):
 
             await interaction.response.send_message(embed=embed, ephemeral=True)
         else:
-            error_data = "".join(traceback.format_exception(type(error), error, error.__traceback__))
-
             embed = discord.Embed(
-                description=f"{error}\n```fix\n{error_data}```",
+                description=f"{error}",
                 colour=discord.Colour.red()
             )
 
+            traceback.print_exception(type(error), error, error.__traceback__)
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
     async def interaction_check(self, interaction: discord.Interaction): # pyright: ignore
@@ -482,18 +477,18 @@ class CommandsCog(commands.Cog):
 
     @discord.app_commands.describe(
         account_name="The name of the new account",
-        owner="The user or role which will own this account",
+        owner="The user or role which will own this account, optional",
         account_type="The account type of the account"
     )
     @discord.app_commands.command(description="Opens a special account in this guild's economy")
-    async def open_special_account(self, interaction: discord.Interaction, account_name: str, owner: discord.Member | discord.Role, account_type: bknd.AccountType):
+    async def open_special_account(self, interaction: discord.Interaction, account_name: str, owner: discord.Member | discord.Role | None, account_type: bknd.AccountType):
         responder = await self.backend.get_responder(interaction)
         economy = await self.backend.get_guild_economy(interaction.guild_id or -1)
         if not economy:
             return await responder("This guild is not registered to an economy", colour=discord.Colour.red())
 
         try:
-            await self.backend.create_account(interaction.user, owner.id, economy, account_name, account_type)
+            await self.backend.create_account(interaction.user, owner.id if owner else owner, economy, account_name, account_type)
             await responder(f"Account created successfully")
         except Exception as e:
             await responder(f"Could not create account: {e}", colour=discord.Colour.red())
@@ -513,9 +508,11 @@ class CommandsCog(commands.Cog):
         if not member:
             return
 
-        acc = await self.bot.get_account_by_name(account, economy) if account else await self.backend.get_account_from_interaction(interaction)
+        acc = await self.bot.get_account_by_name(account, economy) if account else await self.bot.get_account(interaction.user.id, economy)
         if not acc:
             return await responder("Account not found, perhaps you need to create an account or check if the specified account exists?", colour=discord.Colour.red())
+        elif not await self.backend.has_permission(interaction.user, bknd.Permissions.CLOSE_ACCOUNT, account=acc):
+            return await responder("Could not close account: You do not have the permission to transfer the ownership of this account", colour=discord.Colour.red())
 
         confirm_view = ConfirmationView()
         await responder(message=textwrap.dedent(f"""
@@ -537,9 +534,11 @@ class CommandsCog(commands.Cog):
                 if user_acc:
                     login_map[interaction.user.id] = user_acc
 
-                await responder(f"Successfully transferred account ownership to {new_owner.mention}")
+                [login_map.pop(k, None) for k, v in login_map.items() if v.account_id == acc.account_id]
+
+                await responder(f"Successfully transferred account ownership to {new_owner.mention}", edit=True, view=None)
             except Exception as e:
-                await responder(f"Could not transfer account ownership: {e}", colour=discord.Colour.red())
+                await responder(f"Could not transfer account ownership: {e}", colour=discord.Colour.red(), edit=True, view=None)
         else:
             await responder(f"Cancelled operation", edit=True, view=None)
 
@@ -551,7 +550,7 @@ class CommandsCog(commands.Cog):
         if not economy:
             return await responder("This guild is not registered to an economy", colour=discord.Colour.red())
 
-        acc = await self.bot.get_account_by_name(account, economy) if account else await self.backend.get_account_from_interaction(interaction)
+        acc = await self.bot.get_account_by_name(account, economy) if account else await self.bot.get_account(interaction.user.id, economy)
         confirm = skip_confirmation
 
         if not acc:
@@ -568,12 +567,31 @@ class CommandsCog(commands.Cog):
         if confirm:
             try:
                 await self.backend.delete_account(interaction.user, acc)
-                login_map.pop(interaction.user.id, None)
+                [login_map.pop(k, None) for k, v in login_map.items() if v.account_id == acc.account_id]
                 await responder(f"Successfully closed account", edit=True, view=None)
             except Exception as e:
                 await responder(f"Could not close account: {e}", colour=discord.Colour.red(), edit=True, view=None)
         else:
             await responder(f"Cancelled operation", edit=True, view=None)
+
+    @discord.app_commands.describe(name="The new account name", account="The account to rename, defaults to the current logged in account")
+    @discord.app_commands.command(description="Renames an account")
+    async def rename_account(self, interaction: discord.Interaction, name: str, account: Optional[str] = None):
+        responder = await self.backend.get_responder(interaction)
+        economy = await self.backend.get_guild_economy(interaction.guild_id or -1)
+        if not economy:
+            return await responder("This guild is not registered to an economy", colour=discord.Colour.red())
+
+        acc = await self.bot.get_account_by_name(account, economy) if account else await self.bot.get_account(interaction.user.id, economy)
+
+        if not acc:
+            return await responder("Account not found, perhaps you need to create an account or check if the specified account exists?", colour=discord.Colour.red())
+        
+        try:
+            await self.backend.rename_account(interaction.user, acc, name)
+            await responder(f"Successfully renamed account")
+        except Exception as e:
+            await responder(f"Could not rename account: {e}", colour=discord.Colour.red())
 
     @discord.app_commands.describe(account="The account to login to, defaults to your user account if not supplied")
     @discord.app_commands.command(description="Login as an account that is not yours, or into your account if no arguments are provided")
@@ -583,7 +601,7 @@ class CommandsCog(commands.Cog):
         if not economy:
             return await responder("This guild is not registered to an economy", colour=discord.Colour.red())
 
-        acc = await self.bot.get_account_by_name(account, economy) if account else await self.backend.get_account_from_interaction(interaction)
+        acc = await self.bot.get_account_by_name(account, economy) if account else await self.bot.get_account(interaction.user.id, economy)
 
         if not acc:
             return await responder("Account not found, perhaps you need to create an account or check if the specified account exists?", colour=discord.Colour.red())
@@ -600,7 +618,7 @@ class CommandsCog(commands.Cog):
         if not economy:
             return await responder("This guild is not registered to an economy", colour=discord.Colour.red())
 
-        acc = await self.backend.get_account_from_interaction(interaction)
+        acc = await self.bot.get_account(interaction.user.id, economy)
         if not acc:
             return await responder("You are not logged into an account", colour=discord.Colour.red())
         else:
@@ -614,7 +632,7 @@ class CommandsCog(commands.Cog):
         if not economy:
             return await responder("This guild is not registered to an economy", colour=discord.Colour.red())
 
-        acc = await self.bot.get_account_by_name(account, economy) if account else await self.backend.get_account_from_interaction(interaction)
+        acc = await self.bot.get_account_by_name(account, economy) if account else await self.bot.get_account(interaction.user.id, economy)
         if not acc:
             return await responder("Account not found, perhaps you need to create an account or check if the specified account exists?", colour=discord.Colour.red())
 
@@ -635,13 +653,13 @@ class CommandsCog(commands.Cog):
         if not economy:
             return await responder("This guild is not registered to an economy", colour=discord.Colour.red())
 
-        from_acc = await self.backend.get_account_from_interaction(interaction)
+        from_acc = await self.bot.get_account(interaction.user.id, economy)
         if not from_acc:
-            return await responder("From Account not found, perhaps you need to create an account or check if the specified account exists?", colour=discord.Colour.red())
+            return await responder("Could not perform transaction: From account not found, perhaps you need to create an account or check if the specified account exists?", colour=discord.Colour.red())
 
         to_acc = await self.bot.get_account_by_name(to_account, economy)
         if not to_acc:
-            return await responder("To Account not found, perhaps you need to create an account or check if the specified account exists?", colour=discord.Colour.red())
+            return await responder("Could not perform transaction: To account not found, perhaps you need to create an account or check if the specified account exists?", colour=discord.Colour.red())
 
         try:
             await self.backend.perform_transaction(interaction.user, from_acc, to_acc, parse_amount(amount), transaction_type)
@@ -667,7 +685,7 @@ class CommandsCog(commands.Cog):
         if not economy:
             return await responder("This guild is not registered to an economy", colour=discord.Colour.red())
 
-        from_acc = await self.backend.get_account_from_interaction(interaction)
+        from_acc = await self.bot.get_account(interaction.user.id, economy)
         if not from_acc:
             return await responder("From Account not found, perhaps you need to create an account or check if the specified account exists?", colour=discord.Colour.red())
 
@@ -683,7 +701,7 @@ class CommandsCog(commands.Cog):
                 from_acc,
                 to_acc,
                 parse_amount(amount),
-                payment_interval * bknd.DAY_TO_SECOND,
+                payment_interval,
                 number_of_payments,
                 transaction_type
             )
@@ -707,7 +725,7 @@ class CommandsCog(commands.Cog):
             if not economy:
                 return await responder("This guild is not registered to an economy", colour=discord.Colour.red())
 
-            acc = await self.bot.get_account_by_name(account, economy) if account else await self.backend.get_account_from_interaction(interaction)
+            acc = await self.bot.get_account_by_name(account, economy) if account else await self.bot.get_account(interaction.user.id, economy)
             if not acc:
                 return await responder("Account not found, perhaps you need to create an account or check if the specified account exists?", colour=discord.Colour.red())
 
@@ -727,7 +745,7 @@ class CommandsCog(commands.Cog):
                 await responder(f"Logged latest `{len(transactions)}` transaction(s)", as_embed=False, file=file)
             else:
                 
-                    items = [f"- {t.timestamp.strftime("%d/%m/%y %H:%M")} {t.target_account.get_name()} -- {bknd.frmt(t.amount)}{economy.currency_unit} → {t.destination_account.get_name()}"
+                    items = [f"- {t.timestamp.strftime('%d/%m/%y %H:%M')} {t.target_account.get_name()} -- {bknd.frmt(t.amount)}{economy.currency_unit} → {t.destination_account.get_name()}"
                             for t in transactions]
 
                     chunks = PaginatorView.segment_by_length(items)
@@ -763,7 +781,7 @@ class CommandsCog(commands.Cog):
         if not economy:
             return await responder("This guild is not registered to an economy", colour=discord.Colour.red())
 
-        acc = await self.bot.get_account_by_name(account, economy) if account else await self.backend.get_account_from_interaction(interaction)
+        acc = await self.bot.get_account_by_name(account, economy) if account else await self.bot.get_account(interaction.user.id, economy)
         if not acc:
             return await responder("Account not found, perhaps you need to create an account or check if the specified account exists?", colour=discord.Colour.red())
 
@@ -775,7 +793,7 @@ class CommandsCog(commands.Cog):
             allowed.append(str(permission.allowed))
 
         embed = discord.Embed(
-            title=f"Permissions for account {acc.account_name}"
+            description=f"## Permissions for account {acc.account_name}"
         ) \
         .add_field(name="Permission", value='\n'.join(names)) \
         .add_field(name="Allowed", value='\n'.join(allowed))
@@ -798,7 +816,7 @@ class CommandsCog(commands.Cog):
         if not economy:
             return await responder("This guild is not registered to an economy", colour=discord.Colour.red())
 
-        acc = await self.bot.get_account_by_name(account, economy) if account else await self.backend.get_account_from_interaction(interaction)
+        acc = await self.bot.get_account_by_name(account, economy) if account else await self.bot.get_account(interaction.user.id, economy)
         if not acc:
             return await responder("Account not found, perhaps you need to create an account or check if the specified account exists?", colour=discord.Colour.red())
 
@@ -834,7 +852,7 @@ class CommandsCog(commands.Cog):
         
         if not skip_confirmation:
             confirm_view = ConfirmationView()
-            await responder(f"Are you sure you want to prints funds to this account?", view=confirm_view)
+            await responder(f"Are you sure you want to print funds to this account?", view=confirm_view)
             await confirm_view.wait()
             confirm = confirm_view.confirmation
             
@@ -887,14 +905,14 @@ class CommandsCog(commands.Cog):
         affected_type="The account type affected by the tax bracket",
         tax_type="The type of tax to collect",
         bracket_start="The starting account balance of the tax bracket",
-        bracket_end="The ending account balance of the tax bracket",
+        bracket_end="The ending account balance of the tax bracket, leave empty for no end limit",
         rate="Percentage rate of the tax bracket",
         to_account="The account to send tax revenue to"
     )
     @discord.app_commands.command(description="Creates a new tax bracket")
     async def create_tax_bracket(self, interaction: discord.Interaction,
         tax_name: str, affected_type: bknd.AccountType, tax_type: bknd.TaxType,
-        bracket_start: str, bracket_end: str, rate: int, to_account: str):
+        bracket_start: str, bracket_end: Optional[str], rate: int, to_account: str):
         responder = await self.backend.get_responder(interaction)
         economy = await self.backend.get_guild_economy(interaction.guild_id or -1) 
         if not economy:
@@ -911,7 +929,7 @@ class CommandsCog(commands.Cog):
                 affected_type,
                 tax_type,
                 parse_amount(bracket_start),
-                parse_amount(bracket_end),
+                parse_amount(bracket_end) if bracket_end else None,
                 rate, acc
             )
             await responder("Successfully created tax bracket")
@@ -992,7 +1010,7 @@ class CommandsCog(commands.Cog):
         if not economy:
             return await responder("This guild is not registered to an economy", colour=discord.Colour.red())
 
-        acc = await self.bot.get_account_by_name(account, economy) if account else await self.backend.get_account_from_interaction(interaction)
+        acc = await self.bot.get_account_by_name(account, economy) if account else await self.bot.get_account(interaction.user.id, economy)
         if not acc:
             return await responder("Account not found, perhaps you need to create an account or check if the specified account exists?", colour=discord.Colour.red())
 
@@ -1010,7 +1028,7 @@ class CommandsCog(commands.Cog):
         if not economy:
             return await responder("This guild is not registered to an economy", colour=discord.Colour.red())
 
-        acc = await self.bot.get_account_by_name(account, economy) if account else await self.backend.get_account_from_interaction(interaction)
+        acc = await self.bot.get_account_by_name(account, economy) if account else await self.bot.get_account(interaction.user.id, economy)
         if not acc:
             return await responder("Account not found, perhaps you need to create an account or check if the specified account exists?", colour=discord.Colour.red())
 
