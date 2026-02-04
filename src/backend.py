@@ -180,7 +180,7 @@ class Account(Base):
 
 	account_id: Mapped[UUID] = mapped_column(primary_key=True)
 	account_name: Mapped[str] = mapped_column(String(64))
-	owner_id: Mapped[int] = mapped_column(BigInteger(), nullable=True)
+	owner_id: Mapped[Optional[int]] = mapped_column(BigInteger(), nullable=True)
 
 	account_type: Mapped[AccountType] = mapped_column()
 	balance: Mapped[int] = mapped_column(default=0)
@@ -286,7 +286,7 @@ class Tax(Base):
 	tax_type: Mapped[TaxType] = mapped_column()
 
 	bracket_start: Mapped[int] = mapped_column()
-	bracket_end: Mapped[int] = mapped_column(nullable=True)
+	bracket_end: Mapped[Optional[int]] = mapped_column(nullable=True)
 	rate: Mapped[int] = mapped_column()
 
 	to_account_id: Mapped[UUID] = mapped_column(ForeignKey("accounts.account_id"))
@@ -1483,12 +1483,12 @@ class Backend:
 		"""
 		return await self._one_or_none(select(Account).where(Account.account_id == account_id).options(joinedload(Account.economy), selectinload(Account.update_notifiers)))
 
-	async def create_account(self, actor: User, owner_id: int, economy: Economy, name: Optional[str] = None, account_type: AccountType = AccountType.USER) -> Account:
+	async def create_account(self, actor: User, owner_id: Optional[int], economy: Economy, name: Optional[str] = None, account_type: AccountType = AccountType.USER) -> Account:
 		"""
 		Creates a new account.
 		
 		:param actor: The actor of this action.
-		:param owner_id: The user ID of the new account's owner.
+		:param owner_id: (optional) The user ID of the new account's owner.
 		:param economy: The economy in which the account is based in.
 		:param name: (optional) The new account's name. Defaults to the owner's mention.
 		:param account_type: The new account's type. Defaults to a user account.
