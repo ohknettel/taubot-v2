@@ -12,13 +12,6 @@ import time
 
 logger = logging.getLogger(__name__)
 
-class LogLevels(IntEnum):
-	"""
-	:meta private:
-	"""
-	Private = 51
-	Public = 52
-
 def frmt(amount: int) -> str:
 	"""
 	Formats balance in cents into `xx.yy` format.
@@ -71,23 +64,25 @@ class Permissions(IntEnum):
 	# Guild administrator
 	MANAGE_FUNDS = 5
 	MANAGE_TAX_BRACKETS = 6
-	OPEN_SPECIAL_ACCOUNT = 9
-	LOGIN_AS_ACCOUNT = 10
-	GOVERNMENT_OFFICIAL = 11
 
 	# Developer
 	MANAGE_PERMISSIONS = 7
 	MANAGE_ECONOMIES = 8
 
+	# Moderator
+	OPEN_SPECIAL_ACCOUNT = 9
+	LOGIN_AS_ACCOUNT = 10
+
 	# Attributes
+	GOVERNMENT_OFFICIAL = 11
 	USES_EPHEMERAL = 12
 
 class TaxType(IntEnum):
 	"""Enum used to represent the different types of taxation methods."""
-	WEALTH = 0
+	WEALTH_MARGINAL = 0
 	INCOME = 1
 	VAT = 2
-	TRANSACTION = 3
+	WEALTH_FLAT = 3
 
 class TransactionType(IntEnum):
 	"""Enum used to represent the different types of transactions."""
