@@ -456,13 +456,24 @@ class Backend:
 			async with self._sessionmaker() as session:
 				return (await session.execute(stmt)).scalar_one_or_none()
 
+	async def refresh(self, *objects):
+		"""
+		Refreshes detached instances of models.
+
+		:param *objects: The objects to refresh.
+		"""
+		async with self._sessionmaker() as session:
+			await session.flush(objects)
+			for obj in objects:
+				session.add(obj)
+				await session.refresh(obj)
+
 	async def tick(self):
 		"""
 		Triggers a tick in the server.
 		Must be triggered externally.
 		"""
 		tick_time = time.time()
-
 		async with self._sessionmaker.begin() as session:
 			transfer_time = RecurringTransfer.last_payment_timestamp + RecurringTransfer.payment_interval
 
@@ -1551,8 +1562,6 @@ class Backend:
 
 		old_owner_id = account.owner_id
 		async with self._sessionmaker.begin() as session:
-			session.add(account)
-
 			account.owner_id = new_owner_id
 
 			session.add(
@@ -1626,8 +1635,6 @@ class Backend:
 			raise UnauthorizedException("You do not have the permission to delete this account")
 
 		async with self._sessionmaker.begin() as session:
-			session.add(account)
-
 			account.deleted = True
 
 			session.add(
@@ -1639,6 +1646,11 @@ class Backend:
 					cud = CUD.DELETE
 				)
 			)
+
+			if account not in session:
+				session.add(account)
+			else:
+				await session.refresh(account)
 
 	# === Transactions ===
 
@@ -1861,7 +1873,9 @@ class Backend:
 			raise ValueError("There are not sufficient funds in this account to perform this action")
 
 		async with self._sessionmaker.begin() as session:
-			session.add(from_account)
+			if from_account not in session:
+				session.add(from_account)
+
 			from_account.balance -= amount
 
 			session.add(
@@ -1874,6 +1888,8 @@ class Backend:
 					amount = amount
 				)
 			)
+
+			await session.refresh(from_account, ["economy", "update_notifiers"])
 
 		logger.log(LogLevels.Public, f"Economy: {from_account.economy.currency_name}\n<@!{actor.id}> removed {frmt(amount)} from {from_account.account_name}")
 		await self.notify_users(from_account.get_update_notifiers(), f"<@!{actor.id}> removed {frmt(amount)} from {from_account.account_name},\nit\'s new balance is {from_account.get_balance()}", "Balance Update")
