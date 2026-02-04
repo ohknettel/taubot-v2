@@ -8,22 +8,14 @@ import re
 import traceback
 from backend import frmt
 
-syncing = False
 USER_MENTION_REGEX = re.compile(r"^<@!?([0-9]*)>$")
 
 def load_config():
-    global syncing
     if len(sys.argv) > 3:
-        print('Usage: main.py config_path -[S]')
+        print("Usage: main.py config_path")
         sys.exit(1)
 
-    path = 'config.json' if len(sys.argv) < 2 else sys.argv[1]
-    if len(sys.argv) == 3:
-        if sys.argv[2] != "-S":
-            print('Usage: main.py config_path -[S]')
-            sys.exit(1)
-        syncing = True
-
+    path = "config.json" if len(sys.argv) < 2 else sys.argv[1]
     try:
         with open(path) as file:
             return json.load(file)
