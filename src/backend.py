@@ -429,16 +429,18 @@ class Backend:
 		# apparently sessions are meant to be short-lived, oops
 		self._sessionmaker = async_sessionmaker(self.engine, expire_on_commit=False)
 
-	async def initalize(self):
+	async def initialise(self):
 		"""
-		Initalizes the backend by creating the necessary tables for models.
+		Initialises the backend by creating the necessary tables for models.
 
-		.. note
-		This function is automatically called if you use the backend as an async context manager as shown below:
+		.. note::
+
+		   This function is automatically called if you use the backend as an async context manager as shown below:
 		
 		.. code-block:: python
-		async with Backend(...) as backend:
-			...
+
+		   async with Backend(...) as backend:
+			   ...
 		"""
 		async with self.engine.begin() as conn:
 			await conn.run_sync(Base.metadata.create_all)
