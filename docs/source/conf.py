@@ -12,8 +12,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]) + "/src")
 
 project = "Taubot V2.1 Documentation"
-copyright = "2026, Some Stoner, ohknettel"
-author = "Some Stoner"
+copyright = "2026, Some Stoner"
+author = "Taubot Contributors"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

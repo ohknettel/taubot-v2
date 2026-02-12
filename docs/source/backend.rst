@@ -84,6 +84,7 @@ Enums
     :undoc-members:
     :member-order: bysource
 
+.. _permissions_bk:
 .. autoclass:: backend.Permissions
     :members:
     :undoc-members:
