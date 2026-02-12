@@ -10,12 +10,10 @@ Index
 
 It's designed to realistically simulate an economy without alot of the unnecessary inflationary elements of other economy simulators.
 
-
 Contents
 --------
 
 .. toctree::
    usage
+   backend
    api
-
-

@@ -10,15 +10,15 @@
 <meta property="og:title" content="Index" />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://docs.taubot.qzz.io/index.html" />
-<meta property="og:site_name" content="Taubot V2 Documentation" />
+<meta property="og:site_name" content="Taubot V2.1 Documentation" />
 <meta property="og:description" content="Taubot is a discord bot built for and by the SimDemocracy community. It’s designed to realistically simulate an economy without alot of the unnecessary inflationary elements of other economy simula..." />
 <meta property="og:image" content="https://docs.taubot.qzz.io/_static/logo.png" />
-<meta property="og:image:alt" content="Taubot V2 Documentation" />
+<meta property="og:image:alt" content="Taubot V2.1 Documentation" />
 <meta name="description" content="Taubot is a discord bot built for and by the SimDemocracy community. It’s designed to realistically simulate an economy without alot of the unnecessary inflationary elements of other economy simula..." />
 <meta property="og:ignore_canonical" content="true" />
 <meta name="theme-color" content="#e8cc4c" />
 
-    <title>Index &#8212; Taubot V2 Documentation  documentation</title>
+    <title>Index &#8212; Taubot V2.1 Documentation  documentation</title>
   
   
   
@@ -128,7 +128,7 @@
     <img src="_static/logo.png" class="logo__image only-dark pst-js-only" alt=""/>
   
   
-    <p class="title logo__title">Taubot V2 Documentation</p>
+    <p class="title logo__title">Taubot V2.1 Documentation</p>
   
 </a></div>
     
@@ -145,6 +145,13 @@
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="usage.html">
     Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="backend.html">
+    Backend
   </a>
 </li>
 
@@ -238,6 +245,13 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="backend.html">
+    Backend
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="api.html">
     API
   </a>
@@ -306,22 +320,203 @@
 <li class="toctree-l2"><a class="reference internal" href="usage.html#installation">Installation</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="api.html">API</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="api.html#authentication">Authentication</a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#oauth-like-flow-overview">Oauth-like flow overview</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="api.html#starting-the-oauth-like-flow">Starting the oauth-like flow</a></li>
-<li class="toctree-l3"><a class="reference internal" href="api.html#retrieving-a-token">Retrieving a token</a></li>
+<li class="toctree-l1"><a class="reference internal" href="backend.html">Backend</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="backend.html#classes">Classes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="backend.html#utility-classes">Utility classes</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.HasID"><code class="docutils literal notranslate"><span class="pre">HasID</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.HasRoles"><code class="docutils literal notranslate"><span class="pre">HasRoles</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.StubUser"><code class="docutils literal notranslate"><span class="pre">StubUser</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#api-reference">API Reference</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="backend.html#models">Models</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Economy"><code class="docutils literal notranslate"><span class="pre">Economy</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Guild"><code class="docutils literal notranslate"><span class="pre">Guild</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Application"><code class="docutils literal notranslate"><span class="pre">Application</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.APIKey"><code class="docutils literal notranslate"><span class="pre">APIKey</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.APIKey.activate"><code class="docutils literal notranslate"><span class="pre">APIKey.activate()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Account"><code class="docutils literal notranslate"><span class="pre">Account</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Account.delete"><code class="docutils literal notranslate"><span class="pre">Account.delete()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Account.get_balance"><code class="docutils literal notranslate"><span class="pre">Account.get_balance()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Account.get_name"><code class="docutils literal notranslate"><span class="pre">Account.get_name()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Account.get_update_notifiers"><code class="docutils literal notranslate"><span class="pre">Account.get_update_notifiers()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Transaction"><code class="docutils literal notranslate"><span class="pre">Transaction</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.BalanceUpdateNotifier"><code class="docutils literal notranslate"><span class="pre">BalanceUpdateNotifier</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Permission"><code class="docutils literal notranslate"><span class="pre">Permission</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Tax"><code class="docutils literal notranslate"><span class="pre">Tax</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.RecurringTransfer"><code class="docutils literal notranslate"><span class="pre">RecurringTransfer</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="backend.html#id1">Backend</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Backend"><code class="docutils literal notranslate"><span class="pre">Backend</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.change_key_permissions"><code class="docutils literal notranslate"><span class="pre">Backend.change_key_permissions()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.change_many_permissions"><code class="docutils literal notranslate"><span class="pre">Backend.change_many_permissions()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.change_permission"><code class="docutils literal notranslate"><span class="pre">Backend.change_permission()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.close"><code class="docutils literal notranslate"><span class="pre">Backend.close()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.create_account"><code class="docutils literal notranslate"><span class="pre">Backend.create_account()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.create_application"><code class="docutils literal notranslate"><span class="pre">Backend.create_application()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.create_economy"><code class="docutils literal notranslate"><span class="pre">Backend.create_economy()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.create_key"><code class="docutils literal notranslate"><span class="pre">Backend.create_key()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.create_reccuring_transfer"><code class="docutils literal notranslate"><span class="pre">Backend.create_reccuring_transfer()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.create_tax_bracket"><code class="docutils literal notranslate"><span class="pre">Backend.create_tax_bracket()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.delete_account"><code class="docutils literal notranslate"><span class="pre">Backend.delete_account()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.delete_application"><code class="docutils literal notranslate"><span class="pre">Backend.delete_application()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.delete_economy"><code class="docutils literal notranslate"><span class="pre">Backend.delete_economy()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.delete_key"><code class="docutils literal notranslate"><span class="pre">Backend.delete_key()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.delete_tax_bracket"><code class="docutils literal notranslate"><span class="pre">Backend.delete_tax_bracket()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.disable_key"><code class="docutils literal notranslate"><span class="pre">Backend.disable_key()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.enable_key"><code class="docutils literal notranslate"><span class="pre">Backend.enable_key()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.get_account_by_id"><code class="docutils literal notranslate"><span class="pre">Backend.get_account_by_id()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.get_account_by_name"><code class="docutils literal notranslate"><span class="pre">Backend.get_account_by_name()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.get_application"><code class="docutils literal notranslate"><span class="pre">Backend.get_application()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.get_application_keys"><code class="docutils literal notranslate"><span class="pre">Backend.get_application_keys()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.get_authable_accounts"><code class="docutils literal notranslate"><span class="pre">Backend.get_authable_accounts()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.get_economies"><code class="docutils literal notranslate"><span class="pre">Backend.get_economies()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.get_economy_by_id"><code class="docutils literal notranslate"><span class="pre">Backend.get_economy_by_id()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.get_economy_by_name"><code class="docutils literal notranslate"><span class="pre">Backend.get_economy_by_name()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.get_guild_economy"><code class="docutils literal notranslate"><span class="pre">Backend.get_guild_economy()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.get_guild_ids"><code class="docutils literal notranslate"><span class="pre">Backend.get_guild_ids()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.get_key_by_id"><code class="docutils literal notranslate"><span class="pre">Backend.get_key_by_id()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.get_member"><code class="docutils literal notranslate"><span class="pre">Backend.get_member()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.get_permissions"><code class="docutils literal notranslate"><span class="pre">Backend.get_permissions()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.get_tax_bracket"><code class="docutils literal notranslate"><span class="pre">Backend.get_tax_bracket()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.get_tax_brackets"><code class="docutils literal notranslate"><span class="pre">Backend.get_tax_brackets()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.get_transaction_log"><code class="docutils literal notranslate"><span class="pre">Backend.get_transaction_log()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.get_user_account"><code class="docutils literal notranslate"><span class="pre">Backend.get_user_account()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.get_user_applications"><code class="docutils literal notranslate"><span class="pre">Backend.get_user_applications()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.get_user_dms"><code class="docutils literal notranslate"><span class="pre">Backend.get_user_dms()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.has_permission"><code class="docutils literal notranslate"><span class="pre">Backend.has_permission()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.initialise"><code class="docutils literal notranslate"><span class="pre">Backend.initialise()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.key_has_permission"><code class="docutils literal notranslate"><span class="pre">Backend.key_has_permission()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.notify_user"><code class="docutils literal notranslate"><span class="pre">Backend.notify_user()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.notify_users"><code class="docutils literal notranslate"><span class="pre">Backend.notify_users()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.perform_tax"><code class="docutils literal notranslate"><span class="pre">Backend.perform_tax()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.perform_transaction"><code class="docutils literal notranslate"><span class="pre">Backend.perform_transaction()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.print_funds"><code class="docutils literal notranslate"><span class="pre">Backend.print_funds()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.refresh"><code class="docutils literal notranslate"><span class="pre">Backend.refresh()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.register_guild"><code class="docutils literal notranslate"><span class="pre">Backend.register_guild()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.remove_funds"><code class="docutils literal notranslate"><span class="pre">Backend.remove_funds()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.rename_account"><code class="docutils literal notranslate"><span class="pre">Backend.rename_account()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.reset_permission"><code class="docutils literal notranslate"><span class="pre">Backend.reset_permission()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.subscribe"><code class="docutils literal notranslate"><span class="pre">Backend.subscribe()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.tick"><code class="docutils literal notranslate"><span class="pre">Backend.tick()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.toggle_ephemeral"><code class="docutils literal notranslate"><span class="pre">Backend.toggle_ephemeral()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.transfer_ownership"><code class="docutils literal notranslate"><span class="pre">Backend.transfer_ownership()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.unregister_guild"><code class="docutils literal notranslate"><span class="pre">Backend.unregister_guild()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="backend.html#backend.Backend.unsubscribe"><code class="docutils literal notranslate"><span class="pre">Backend.unsubscribe()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="backend.html#enums">Enums</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="backend.html#backend.LogLevels"><code class="docutils literal notranslate"><span class="pre">LogLevels</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.LogLevels.Private"><code class="docutils literal notranslate"><span class="pre">LogLevels.Private</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.LogLevels.Public"><code class="docutils literal notranslate"><span class="pre">LogLevels.Public</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="backend.html#backend.AccountType"><code class="docutils literal notranslate"><span class="pre">AccountType</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.AccountType.USER"><code class="docutils literal notranslate"><span class="pre">AccountType.USER</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.AccountType.GOVERNMENT"><code class="docutils literal notranslate"><span class="pre">AccountType.GOVERNMENT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.AccountType.CORPORATION"><code class="docutils literal notranslate"><span class="pre">AccountType.CORPORATION</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.AccountType.CHARITY"><code class="docutils literal notranslate"><span class="pre">AccountType.CHARITY</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.AccountType.FINANCIAL"><code class="docutils literal notranslate"><span class="pre">AccountType.FINANCIAL</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="backend.html#backend.Permissions"><code class="docutils literal notranslate"><span class="pre">Permissions</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Permissions.OPEN_ACCOUNT"><code class="docutils literal notranslate"><span class="pre">Permissions.OPEN_ACCOUNT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Permissions.VIEW_BALANCE"><code class="docutils literal notranslate"><span class="pre">Permissions.VIEW_BALANCE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Permissions.CLOSE_ACCOUNT"><code class="docutils literal notranslate"><span class="pre">Permissions.CLOSE_ACCOUNT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Permissions.TRANSFER_FUNDS"><code class="docutils literal notranslate"><span class="pre">Permissions.TRANSFER_FUNDS</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Permissions.CREATE_RECURRING_TRANSFERS"><code class="docutils literal notranslate"><span class="pre">Permissions.CREATE_RECURRING_TRANSFERS</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Permissions.MANAGE_FUNDS"><code class="docutils literal notranslate"><span class="pre">Permissions.MANAGE_FUNDS</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Permissions.MANAGE_TAX_BRACKETS"><code class="docutils literal notranslate"><span class="pre">Permissions.MANAGE_TAX_BRACKETS</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Permissions.MANAGE_PERMISSIONS"><code class="docutils literal notranslate"><span class="pre">Permissions.MANAGE_PERMISSIONS</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Permissions.MANAGE_ECONOMIES"><code class="docutils literal notranslate"><span class="pre">Permissions.MANAGE_ECONOMIES</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Permissions.OPEN_SPECIAL_ACCOUNT"><code class="docutils literal notranslate"><span class="pre">Permissions.OPEN_SPECIAL_ACCOUNT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Permissions.LOGIN_AS_ACCOUNT"><code class="docutils literal notranslate"><span class="pre">Permissions.LOGIN_AS_ACCOUNT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Permissions.GOVERNMENT_OFFICIAL"><code class="docutils literal notranslate"><span class="pre">Permissions.GOVERNMENT_OFFICIAL</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Permissions.USES_EPHEMERAL"><code class="docutils literal notranslate"><span class="pre">Permissions.USES_EPHEMERAL</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="backend.html#backend.TaxType"><code class="docutils literal notranslate"><span class="pre">TaxType</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.TaxType.WEALTH_MARGINAL"><code class="docutils literal notranslate"><span class="pre">TaxType.WEALTH_MARGINAL</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.TaxType.INCOME"><code class="docutils literal notranslate"><span class="pre">TaxType.INCOME</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.TaxType.VAT"><code class="docutils literal notranslate"><span class="pre">TaxType.VAT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.TaxType.WEALTH_FLAT"><code class="docutils literal notranslate"><span class="pre">TaxType.WEALTH_FLAT</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="backend.html#backend.TransactionType"><code class="docutils literal notranslate"><span class="pre">TransactionType</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.TransactionType.PERSONAL"><code class="docutils literal notranslate"><span class="pre">TransactionType.PERSONAL</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.TransactionType.INCOME"><code class="docutils literal notranslate"><span class="pre">TransactionType.INCOME</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.TransactionType.PURCHASE"><code class="docutils literal notranslate"><span class="pre">TransactionType.PURCHASE</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="backend.html#backend.Actions"><code class="docutils literal notranslate"><span class="pre">Actions</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Actions.TRANSFER"><code class="docutils literal notranslate"><span class="pre">Actions.TRANSFER</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Actions.MANAGE_FUNDS"><code class="docutils literal notranslate"><span class="pre">Actions.MANAGE_FUNDS</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Actions.UPDATE_PERMISSIONS"><code class="docutils literal notranslate"><span class="pre">Actions.UPDATE_PERMISSIONS</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Actions.UPDATE_TAX_BRACKETS"><code class="docutils literal notranslate"><span class="pre">Actions.UPDATE_TAX_BRACKETS</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Actions.UPDATE_ECONOMIES"><code class="docutils literal notranslate"><span class="pre">Actions.UPDATE_ECONOMIES</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Actions.PERFORM_TAXES"><code class="docutils literal notranslate"><span class="pre">Actions.PERFORM_TAXES</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.Actions.UPDATE_ACCOUNTS"><code class="docutils literal notranslate"><span class="pre">Actions.UPDATE_ACCOUNTS</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="backend.html#backend.CUD"><code class="docutils literal notranslate"><span class="pre">CUD</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.CUD.CREATE"><code class="docutils literal notranslate"><span class="pre">CUD.CREATE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.CUD.UPDATE"><code class="docutils literal notranslate"><span class="pre">CUD.UPDATE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.CUD.DELETE"><code class="docutils literal notranslate"><span class="pre">CUD.DELETE</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="backend.html#backend.KeyType"><code class="docutils literal notranslate"><span class="pre">KeyType</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.KeyType.GRANT"><code class="docutils literal notranslate"><span class="pre">KeyType.GRANT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="backend.html#backend.KeyType.MASTER"><code class="docutils literal notranslate"><span class="pre">KeyType.MASTER</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="backend.html#exceptions">Exceptions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="backend.html#backend.BackendException"><code class="docutils literal notranslate"><span class="pre">BackendException</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="backend.html#backend.UnauthorizedException"><code class="docutils literal notranslate"><span class="pre">UnauthorizedException</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="backend.html#backend.NotFoundException"><code class="docutils literal notranslate"><span class="pre">NotFoundException</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="backend.html#backend.AlreadyExistsException"><code class="docutils literal notranslate"><span class="pre">AlreadyExistsException</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="backend.html#backend.ValueError"><code class="docutils literal notranslate"><span class="pre">ValueError</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="api.html#authentication">Authentication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#app-authorization-flow-overview">App authorization flow overview</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api.html#permissions">Permissions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api.html#receiving-a-reference-uuid">Receiving a reference UUID</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="api.html#endpoints">Endpoints</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="api.html#constructing-a-grant-url">Constructing a grant URL</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api.html#authorization-on-the-user-s-end">Authorization on the user’s end</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api.html#retrieving-the-grant-key">Retrieving the grant key</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="api.html#id1">Endpoints</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="api.html#updating-the-grant-key">Updating the grant key</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="api.html#id2">Endpoints</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#api-reference">API reference</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="api.html#response-types">Response Types</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="api.html#application">Application</a></li>
 <li class="toctree-l4"><a class="reference internal" href="api.html#account">Account</a></li>
-<li class="toctree-l4"><a class="reference internal" href="api.html#account-type">Account Type</a></li>
 <li class="toctree-l4"><a class="reference internal" href="api.html#transaction">Transaction</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="api.html#endpoints">Endpoints</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api.html#id6">Endpoints</a></li>
 </ul>
 </li>
 </ul>
@@ -398,7 +593,7 @@
 
   <p class="copyright">
     
-      © Copyright 2025, Some Stoner.
+      © Copyright 2026, Some Stoner.
       <br/>
     
   </p>
