@@ -8,7 +8,7 @@ import re
 import traceback
 from backend import frmt
 
-USER_MENTION_REGEX = re.compile(r"^<@!?([0-9]*)>$")
+USER_MENTION_REGEX = re.compile(r"<@!?([0-9]*)>")
 
 def load_config():
     if len(sys.argv) > 3:
@@ -27,7 +27,8 @@ def resolve_mentions(name: str, bot: discord.Client) -> str:
     Helper function to resolve mentions in account names where applicable.
     
     :param name: The account name.
-    :returns The accout name with mentions resolved.
+    
+    :returns: The accout name with mentions resolved.
     """
 
     name = name.strip()
