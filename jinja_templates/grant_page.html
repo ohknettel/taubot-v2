@@ -1,35 +1,75 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <link rel="stylesheet" href="{{ static_uri }}/styles.css">
-        <script src="{{ static_uri }}/index.js"></script>
-    </head>
-    <body>
-        <div id="header">
-            <h1>Authorizing {{ app.application_name }} on behalf of {{ issuer.name }}</h1>
-        </div>
-        <div id="accounts">
-            <div id="accounts-header">
-                <h2>Your Accounts: </h2>
-            </div>
-            <div id="accounts-list">
-            {% for account in accounts %}
-                <div class="account-object" id="{{ account.account_id }}">
-                    <h3>{{ account.account_name }}</h3> <br/>
-                    <b>Account Type: </b>{{ account.account_type.name }} <br/>
-                    <b>Owner ID: </b> {{ account.owner_id }} <br/>
-                    {% if has_perm(1, account) %}
-                    <label for="VIEW_BALANCE">VIEW BALANCE</label> <input type="checkbox" id="VIEW_BALANCE"><br/>
-                    {% endif %}
-                    {% if has_perm(3, account) %}
-                    <label for="TRANSFER_FUNDS">TRANSFER FUNDS</label> <input type="checkbox" id="TRANSFER_FUNDS"><br/>
-                    {% endif %}
-                </div><br/>
-            {% endfor %}
-            </div>
-            <label for="spending_limit">Spending Limit: </label> <input type="number" id="spending_limit" value="0"> <br/>
-            <button onclick="submit()">Submit</button>
+<head>
+    <title>Grant permissions</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}">
+</head>
+<body>
+    <div class="box">
+        <form action="/api/oauth/submit" method="post">
+            <label for="account">
+                {% if accounts|length == 1 %}
+                Update account
+                {% else %}
+                Select account
+                {% endif %}
+            </label><br>
+            <select id="account" name="account" onchange="updatePerms()" style="{% if accounts|length == 1 %} pointer-events: none; {% endif %}" required>
+                {% if accounts|length > 1 %}
+                <option value="" disabled selected>-- Choose --</option>
+                {% endif %}
 
-        </div>
-    </body>
+                {% for account in accounts %}
+                <option value="{{ account.account_id }}">
+                    {{ fetch_name(account.account_name) }}
+                </option>
+                {% endfor %}
+            </select>
+
+            <br>
+
+            {% if permissions|length > 0 %}
+                <br>
+                <p id="display">Permissions: <i>Select an account...</i></p>
+                <br>
+            {% endif %}
+
+            <hr size="2px" noshade color="#E4C844">
+
+            <br>
+
+            <label for="limit">Spending limit:</label>
+            <input type="number" id="limit" name="spending_limit" value="0" min="1">
+            
+            <br>
+
+            <input type="checkbox" id="no_limit" name="no_limit" onchange="toggleLimit(this)">
+            <label for="no_limit">Disable spending limit</label>
+            <p id="no_limit_warning" style="color: red; margin: 0" hidden><br><span class="monobold">Allocating no spending limit to this application is dangerous</span>. If transfer permissions are authorized, this application will be free to spend <span class="monobold">whatever is avaliable in your account to no limits</span>. Consider setting a spending limit, or allocating no spending limit <span class="monobold">at your own risk.</span></p>
+
+            <br><br>
+            <input type="submit" value="Authorize">
+        </form>
+    </div>
+
+    <script>
+        function updatePerms() {
+            let sel = document.getElementById("account")
+            let display = document.getElementById("display")
+
+            if (sel.selectedIndex <= 0) return
+            let selectedOption = sel.options[sel.selectedIndex]
+
+            let appName = "{{ application_name }}"
+
+            display.innerHTML = `Application <span class="monobold">${appName}</span> is requesting the following permissions:<br><br>${permissions.map(p => `<span class="monobold">${p[0]}</span><br>${p[1]}`).join("<br><br>")}`
+        }
+
+        function toggleLimit(cb) {
+            document.getElementById("limit").disabled = cb.checked;
+            warn = document.getElementById("no_limit_warning")
+            warn.hidden = !cb.checked
+        }
+    </script>
+</body>
 </html>

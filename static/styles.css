@@ -1,8 +1,73 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+
+* {
+	margin: 0;
+	padding: 0;
+	box-sizing: border-box;
+	font-family: "Space Mono", monospace;
+	font-weight: 400;
+	font-style: normal;
+}
+
 body {
-    text-align: center;
+	--dot-size: 0.25rem; /* I dont know how this looks on mobile devices, I trial-ed and error-ed these values for my desktop enviroment, sorry mobile users */
+	--bg-size: 3.65rem; /* I dont know how this looks on mobile devices, I trial-ed and error-ed these values for my desktop enviroment, sorry mobile users */
+	--bg-pos: calc(var(--bg-size) / 2); /* I dont know how this looks on mobile devices, I trial-ed and error-ed these values for my desktop enviroment, sorry mobile users */
+	--dot-colour: #1c405c; 
+	--bg-colour: #163248;
+
+	background-color: var(--bg-colour);
+	background-image: radial-gradient(
+		circle at center,
+		var(--dot-colour) var(--dot-size),
+		transparent 0
+	), radial-gradient(circle at center, var(--dot-colour) var(--dot-size), transparent 0);
+
+	background-size: var(--bg-size) var(--bg-size);
+	background-position: 0 0, var(--bg-pos) var(--bg-pos);
+
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	min-height: 100vh;
 }
 
-div {
-    border: solid;
+.box {
+	--border-colour: #E4C844;
+
+	width: 24rem;
+	background-color: whitesmoke;
+	border: 2px solid var(--border-colour);
+	padding: 1.5rem;
+	text-align: center;
 }
 
+.monobold {
+	font-family: "Space Mono", monospace;
+	font-weight: 700;
+	font-style: normal;
+}
+
+input[type="submit"], 
+select {
+    appearance: none;
+	border: 2px solid var(--border-colour);
+	color: #163248;
+
+	padding: 0.75rem 1.25rem;
+	margin-top: 0.5rem;
+	width: 100%;
+	
+	cursor: pointer;
+}
+
+input[type="submit"] {
+	background-color: var(--border-colour);
+	color: whitesmoke;
+	font-size: 14pt;
+}
+
+input[type="submit"]:hover {
+	filter: brightness(0.95);
+	transition: 0.2s ease;
+}
