@@ -10,15 +10,15 @@
 <meta property="og:title" content="Usage" />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://docs.taubot.qzz.io/usage.html" />
-<meta property="og:site_name" content="Taubot V2 Documentation" />
-<meta property="og:description" content="Prerequisites: There are some programs that are needed, to install taubot namely git, python3.12+ and a matching version python3-venv For deployment of a production server it’s recommended you inst..." />
+<meta property="og:site_name" content="Taubot V2.1 Documentation" />
+<meta property="og:description" content="Prerequisites: There are some programs that are needed to install Taubot, namely: Git, Python 3.12+. For deployment of a production server it’s recommended you install Postgres, but any SQL databas..." />
 <meta property="og:image" content="https://docs.taubot.qzz.io/_static/logo.png" />
-<meta property="og:image:alt" content="Taubot V2 Documentation" />
-<meta name="description" content="Prerequisites: There are some programs that are needed, to install taubot namely git, python3.12+ and a matching version python3-venv For deployment of a production server it’s recommended you inst..." />
+<meta property="og:image:alt" content="Taubot V2.1 Documentation" />
+<meta name="description" content="Prerequisites: There are some programs that are needed to install Taubot, namely: Git, Python 3.12+. For deployment of a production server it’s recommended you install Postgres, but any SQL databas..." />
 <meta property="og:ignore_canonical" content="true" />
 <meta name="theme-color" content="#e8cc4c" />
 
-    <title>Usage &#8212; Taubot V2 Documentation  documentation</title>
+    <title>Usage &#8212; Taubot V2.1 Documentation  documentation</title>
   
   
   
@@ -55,7 +55,7 @@
     <link rel="icon" href="_static/favicon.png"/>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="API" href="api.html" />
+    <link rel="next" title="Backend" href="backend.html" />
     <link rel="prev" title="Index" href="index.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
@@ -129,7 +129,7 @@
     <img src="_static/logo.png" class="logo__image only-dark pst-js-only" alt=""/>
   
   
-    <p class="title logo__title">Taubot V2 Documentation</p>
+    <p class="title logo__title">Taubot V2.1 Documentation</p>
   
 </a></div>
     
@@ -146,6 +146,13 @@
 <li class="nav-item current active">
   <a class="nav-link nav-internal" href="#">
     Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="backend.html">
+    Backend
   </a>
 </li>
 
@@ -237,6 +244,13 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="backend.html">
+    Backend
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="api.html">
     API
   </a>
@@ -320,46 +334,49 @@
 <h1>Usage<a class="headerlink" href="#usage" title="Link to this heading">#</a></h1>
 <section id="prerequisites">
 <span id="id1"></span><h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading">#</a></h2>
-<p>There are some programs that are needed, to install taubot namely git, python3.12+ and a matching version python3-venv</p>
-<p>For deployment of a production server it’s recommended you install postgres, but any SQL database should work although only postgres and sqlite are supported, using another dbms may result in undefined behaviour.</p>
-<p>Sqlite is recommended for local development environments as it’s setup and overhead are significantly less invasive</p>
+<p>There are some programs that are needed to install Taubot, namely:</p>
+<ul class="simple">
+<li><p>Git</p></li>
+<li><p>Python 3.12+</p></li>
+</ul>
+<p>For deployment of a production server it’s recommended you install Postgres, but any SQL database should work although only Postgres and SQLite are supported, <strong>using another DBMs may result in undefined behaviour</strong>.</p>
+<p>SQLite is recommended for local development environments as its setup and overhead are significantly less invasive.</p>
 </section>
 <section id="installation">
 <span id="id2"></span><h2>Installation<a class="headerlink" href="#installation" title="Link to this heading">#</a></h2>
-<p>First clone the repo and cd into it:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/gamingdiamond982/taubot-v2.git<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>taubot-v2
+<p>First clone the repo and enter it:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/ohknettel/taubot-v2.git<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>taubot-v2
 </pre></div>
 </div>
-<p>Next you should create a virtualenv to store all of the projects dependencies and activate it:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>python3<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>./.venv<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>.<span class="w"> </span>./.venv/bin/activate
+<p>Next, you should create a virtual environment to store all of the projects dependencies and activate it:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>python3<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>.venv/bin/activate
 </pre></div>
 </div>
 <p>Now it’s time for you to install the dependencies:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>python3<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements.txt
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>python3<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-U<span class="w"> </span>-r<span class="w"> </span>requirements.txt
 </pre></div>
 </div>
-<p>Once you’ve this done you should create your config.json, a redacted version of the one used in production is provided for your convenience</p>
+<p>Once you’ve this done you should create your <cite>config.json</cite>, a redacted version of the one used in production is provided for your convenience:</p>
 <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
 <span class="w">    </span><span class="nt">&quot;discord_token&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Your bot token here&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;database_uri&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;postgresql://username:password@localhost/taubot&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;database_uri&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;postgresql+asyncpg://username:password@localhost/taubot&quot;</span><span class="p">,</span>
 <span class="w">    </span><span class="nt">&quot;private_webhook_url&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Webhook URL for all transaction logs to be sent too&quot;</span><span class="p">,</span>
 <span class="w">    </span><span class="nt">&quot;public_webhook_url&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Webhook URL for transactions by government officials to be sent too&quot;</span><span class="p">,</span>
 <span class="w">    </span><span class="nt">&quot;api&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;sync&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
 <span class="w">    </span><span class="nt">&quot;oauth&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">            </span><span class="nt">&quot;redirect_url&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://discord.com/oauth2/authorize?client_id=1236137854128623677&amp;response_type=code&amp;redirect_uri=https%3A%2F%2Ftaubot.qzz.io%2Fapi%2Foauth%2Foauth-callback&amp;scope=identify&quot;</span><span class="p">,</span>
 <span class="w">            </span><span class="nt">&quot;redirect_uri&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://taubot.qzz.io/api/oauth/oauth-callback&quot;</span><span class="p">,</span>
 <span class="w">            </span><span class="nt">&quot;client_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1236137854128623677&quot;</span><span class="p">,</span>
 <span class="w">            </span><span class="nt">&quot;client_secret&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Your oauth secret here&quot;</span>
 <span class="w">    </span><span class="p">},</span>
-<span class="w">    </span><span class="nt">&quot;static_uri&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://taubot.qzz.io/static&quot;</span>
+<span class="w">    </span><span class="nt">&quot;static_uri&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://taubot.qzz.io/static&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;session_key&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;A secret key to encrypt sessions for user authorizing&quot;</span>
 <span class="p">}</span>
 </pre></div>
 </div>
-<p>Now your ready to go you can start taubot with the <cite>-S</cite> flag to sync the commands with discord, this flag should only be used after taubot is newly installed or if it has had new commands added</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>python3<span class="w"> </span>src/main.py<span class="w"> </span>config.json<span class="w"> </span>-S
-</pre></div>
-</div>
-<p>If you wish to run taubot in the background you can run:</p>
+<p>Now your ready to go you can start Taubot with <code class="docutils literal notranslate"><span class="pre">sync</span></code> set to <code class="docutils literal notranslate"><span class="pre">true</span></code> to sync the commands with Discord. This flag should only be used after Taubot is newly installed or if it has had new commands added.</p>
+<p>If you wish to run Taubot in the background you can run:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>python3<span class="w"> </span>src/main.py<span class="w"> </span><span class="p">&amp;</span>&gt;&gt;./out.log<span class="w"> </span><span class="p">&amp;</span>
 </pre></div>
 </div>
@@ -386,11 +403,11 @@
       </div>
     </a>
     <a class="right-next"
-       href="api.html"
+       href="backend.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">API</p>
+        <p class="prev-next-title">Backend</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -443,7 +460,7 @@
 
   <p class="copyright">
     
-      © Copyright 2025, Some Stoner.
+      © Copyright 2026, Some Stoner.
       <br/>
     
   </p>
