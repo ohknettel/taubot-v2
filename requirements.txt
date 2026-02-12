@@ -2,7 +2,8 @@ SQLAlchemy
 asyncpg
 pyjwt
 cryptography
-aiohttp
 discord.py
-discord-oauth2.py
 jinja2
+fastapi[standard]
+cachetools
+itsdangerous
