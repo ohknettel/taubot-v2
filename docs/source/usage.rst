@@ -56,7 +56,8 @@ Once you've this done you should create your `config.json`, a redacted version o
                 "client_id": "1236137854128623677",
                 "client_secret": "Your oauth secret here"
         },
-        "static_uri": "https://taubot.qzz.io/static"
+        "static_uri": "https://taubot.qzz.io/static",
+        "session_key": "A secret key to encrypt sessions for user authorizing"
     }
 
 Now your ready to go you can start Taubot with ``sync`` set to ``true`` to sync the commands with Discord. This flag should only be used after Taubot is newly installed or if it has had new commands added.
