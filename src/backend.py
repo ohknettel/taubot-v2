@@ -351,7 +351,7 @@ class HasRoles(Protocol):
 	id: int
 	roles: List[HasID]
 
-type User = Union[HasID, HasRoles]
+User = Union[HasID, HasRoles]
 
 _get_roles = lambda u: [r.id for r in cast(HasRoles, u).roles] if isinstance(u, (HasRoles, discord.Member)) else []
 
