@@ -1824,35 +1824,33 @@ class Backend:
 		
 		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
 		"""
-		if not await self.has_permission(actor, Permissions.MANAGE_FUNDS, economy=to_account.economy):
+		actor_ = StubUser(actor.key_id) if isinstance(actor, APIKey) else actor
+
+		if not await self.has_permission(actor_, Permissions.MANAGE_FUNDS, economy=to_account.economy):
 			raise UnauthorizedException("You do not have the permission to print funds")
 
-		async with self._sessionmaker() as session:
-			async with session.begin():
-				to_account.balance += amount
-				
-				session.add(
-					Transaction(
-						actor_id = actor.id,
-						economy_id = to_account.economy.economy_id,
-						destination_account_id = to_account.account_id,
-						action = Actions.MANAGE_FUNDS,
-						cud = CUD.CREATE,
-						amount = amount
-					)
-				)
-
+		async with self._sessionmaker.begin() as session:
 			if to_account not in session:
 				session.add(to_account)
-			else:
-				await session.refresh(to_account)
 
-			await session.commit()
+			to_account.balance += amount
+			
+			session.add(
+				Transaction(
+					actor_id = actor_.id,
+					economy_id = to_account.economy.economy_id,
+					destination_account_id = to_account.account_id,
+					action = Actions.MANAGE_FUNDS,
+					cud = CUD.CREATE,
+					amount = amount
+				)
+			)
 
-		logger.log(LogLevels.Public, f"Economy: {to_account.economy.currency_name}\n<@!{actor.id}> printed {frmt(amount)} to {to_account.account_name}")
-		await self.notify_users(to_account.get_update_notifiers(), f"<@!{actor.id}> printed {frmt(amount)} to {to_account.account_name},\nit\'s new balance is {to_account.get_balance()}", "Balance Update")
+		title = f"Application {actor.application.application_name}" if isinstance(actor, APIKey) else f"<@!{actor_.id}>"
+		logger.log(LogLevels.Public, f"Economy: {to_account.economy.currency_name}\n{title} printed {frmt(amount)} to {to_account.account_name}")
+		await self.notify_users(to_account.get_update_notifiers(), f"{title} printed {frmt(amount)} to {to_account.account_name},\nit\'s new balance is {to_account.get_balance()}", "Balance Update")
 
-	async def remove_funds(self, actor: User, from_account: Account, amount: int):
+	async def remove_funds(self, actor: User | APIKey, from_account: Account, amount: int):
 		"""
 		Removes funds from an account.
 		
@@ -1863,7 +1861,9 @@ class Backend:
 		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
 		:raises ValueError: Raises a value error if there are not sufficient funds to remove from the account.
 		"""
-		if not await self.has_permission(actor, Permissions.MANAGE_FUNDS, economy=from_account.economy):
+		actor_ = StubUser(actor.key_id) if isinstance(actor, APIKey) else actor
+
+		if not await self.has_permission(actor_, Permissions.MANAGE_FUNDS, economy=from_account.economy):
 			raise UnauthorizedException("You do not have the permission to print funds")
 		elif from_account.balance < amount:
 			raise ValueError("There are not sufficient funds in this account to perform this action")
@@ -1876,7 +1876,7 @@ class Backend:
 
 			session.add(
 				Transaction(
-					actor_id = actor.id,
+					actor_id = actor_.id,
 					economy_id = from_account.economy.economy_id,
 					destination_account_id = from_account.account_id,
 					action = Actions.MANAGE_FUNDS,
@@ -1887,8 +1887,9 @@ class Backend:
 
 			await session.refresh(from_account, ["economy", "update_notifiers"])
 
-		logger.log(LogLevels.Public, f"Economy: {from_account.economy.currency_name}\n<@!{actor.id}> removed {frmt(amount)} from {from_account.account_name}")
-		await self.notify_users(from_account.get_update_notifiers(), f"<@!{actor.id}> removed {frmt(amount)} from {from_account.account_name},\nit\'s new balance is {from_account.get_balance()}", "Balance Update")
+		title = f"Application {actor.application.application_name}" if isinstance(actor, APIKey) else f"<@!{actor_.id}>"
+		logger.log(LogLevels.Public, f"Economy: {from_account.economy.currency_name}\n{title} removed {frmt(amount)} from {from_account.account_name}")
+		await self.notify_users(from_account.get_update_notifiers(), f"{title} removed {frmt(amount)} from {from_account.account_name},\nit\'s new balance is {from_account.get_balance()}", "Balance Update")
 
 	# === Notifications ===
 
