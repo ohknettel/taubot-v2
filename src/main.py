@@ -5,6 +5,7 @@ from middleman import DiscordBackendInterface, logger as backend_logger, backend
 from datetime import time as datetime_time, datetime
 from typing import Optional
 from enum import IntEnum
+from logging.handlers import TimedRotatingFileHandler
 
 import asyncio
 import aiohttp
@@ -16,24 +17,32 @@ import textwrap
 import api
 import sys
 import io
+import os
 
 # Regexes
 CURRENCY_REGEX = re.compile(r"^[0-9]*([.,][0-9]{1,2}0*)?$")
 
 # Logging
-logger = logging.getLogger(__name__)
-handler = logging.StreamHandler()
 formatter = logging.Formatter("[%(asctime)s] [%(name)s] [%(levelname)s]: %(message)s")
+logger = logging.getLogger(os.path.basename(__file__).split(".")[0])
 
-handler.setLevel(logging.INFO)
-handler.setFormatter(formatter)
+stream = logging.StreamHandler()
+stream.setFormatter(formatter)
+stream.setLevel(logging.INFO)
 
-for lgr in [logger, backend_logger,]:
-    lgr.setLevel(logging.INFO)
-    lgr.addHandler(handler)
+logger.addHandler(stream)
+logger.setLevel(logging.INFO)
+
+for lgr in [backend_logger, api.logger]:
+	handler = TimedRotatingFileHandler(f"logs/{lgr.name}.log", "midnight", backupCount=15, encoding="utf-8") # daily logs for 15 days
+	handler.setFormatter(formatter)
+	handler.setLevel(logging.INFO)
+
+	lgr.addHandler(handler)
+	lgr.setLevel(logging.INFO)
 
 class WebhookHandler(logging.Handler):
-    def __init__(self, webhook_url, *args, **kwargs):
+	def __init__(self, webhook_url, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._webhook_url = webhook_url
         self.session = aiohttp.ClientSession()
