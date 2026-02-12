@@ -1,4 +1,4 @@
-from sqlalchemy import INT, JSON, AsyncAdaptedQueuePool, BigInteger, DateTime, ForeignKey, String, delete, func, or_, and_, select, true, update, case
+from sqlalchemy import INT, JSON, AsyncAdaptedQueuePool, BigInteger, DateTime, ForeignKey, String, delete, func, or_, and_, select, true, update, case, exists
 from sqlalchemy.orm import DeclarativeBase, Mapped, joinedload, load_only, mapped_column, relationship, selectinload
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from datetime import datetime
@@ -9,8 +9,9 @@ import discord
 import logging
 import asyncio
 import time
+import os
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(os.path.basename(__file__).split(".")[0])
 
 def frmt(amount: int) -> str:
 	"""
@@ -158,8 +159,8 @@ class APIKey(Base):
 	# Ref: https://discord.com/developers/docs/reference#snowflakes
 	key_id: Mapped[int] = mapped_column(INT(), primary_key=True, autoincrement=True) 
 	application_id = mapped_column(ForeignKey("applications.application_id", ondelete="CASCADE"))
-	internal_app_id: Mapped[UUID] = mapped_column(nullable=True)
 	issuer_id: Mapped[int] = mapped_column(BigInteger(), nullable=False)
+	account_id = mapped_column(ForeignKey("accounts.account_id"), nullable=True)
 
 	spending_limit: Mapped[int] = mapped_column(nullable=True)
 	spent_to_date: Mapped[int] = mapped_column(nullable=True, default=0)
@@ -167,6 +168,7 @@ class APIKey(Base):
 	type: Mapped[KeyType] = mapped_column(default=KeyType.GRANT)
 	enabled: Mapped[bool] = mapped_column(default=False)
 	application: Mapped[Application] = relationship(back_populates="api_keys")
+	account: Mapped[Optional["Account"]] = relationship(back_populates=None)
 
 	def activate(self):
 		"""
@@ -459,10 +461,10 @@ class Backend:
 				return (await session.execute(stmt)).scalar_one_or_none()
 
 	async def refresh(self, *objects):
-		"""
+		r"""
 		Refreshes detached instances of models.
 
-		:param *objects: The objects to refresh.
+		:param \*objects: The objects to refresh.
 		"""
 		async with self._sessionmaker() as session:
 			await session.flush(objects)
@@ -536,32 +538,41 @@ class Backend:
 				await session.execute(stmt)
 			).scalars().all()
 
-	async def get_authable_accounts(self, user: User, economy: Optional[Economy] = None)  -> Sequence[Account]:
+	async def get_authable_accounts(self, user: User, permissions: List[Permissions], economy: Optional[Economy] = None) -> Sequence[Account]:
 		"""
 		Returns all accounts a member owns or has permissions for.
 		
 		:param user: A member-like object.
+		:param permissions: The permissions to check.
 		:param economy: (optional) Economy for economy-based permissions.
 		
 		:returns: A list of accounts.
 		"""
+		# i don't know what kind of wonky solution is this its supposed to be the SQL equivalent of
+		# all(P.acc_id = acc.acc_id and P.perm = perm and (P.allowed = True or (perm in default and acc.owner_id == user.id)) for perm in permissions)
+		# there's probably a more efficient way of doing this but shrug
+		exists_s = []
+		for perm in permissions:
+			exists_s.append(exists().where(
+					 			Permission.account_id == Account.account_id,
+					 			Permission.permission == perm,
+					 			or_(Account.owner_id == user.id, Permission.allowed == True) if perm in DEFAULT_OWNER_PERMISSIONS else Permission.allowed == True
+					 		)) # EXISTS short circuits, less expensive than OUTER JOIN which can (and WILL) return dupl results
+
 		stmt = select(Account) \
-			  .outerjoin(Permission) \
-			  .where(
-				or_(
-					Permission.user_id.in_([user.id] + _get_roles(user)),
-					Account.owner_id == user.id
+				 .where(
+				 	or_(
+				 		and_(*exists_s),
+				 		Account.owner_id == user.id
+					),
+				 	Account.economy_id != None
 				)
-			  ) \
-			  .distinct()
 
 		if economy:
-			stmt = stmt.where(Permission.economy_id == economy.economy_id).options(joinedload(Permission.economy_id))
+			stmt = stmt.where(Account.economy_id == economy.economy_id)
 
 		async with self._sessionmaker() as session:
-			return (
-				await session.execute(stmt)
-			).scalars().all()
+			return (await session.execute(stmt)).unique().scalars().all()
 
 	async def key_has_permission(self, key: APIKey, permission: Permissions, account: Optional[Account] = None, economy: Optional[Economy] = None) -> bool:
 		"""
@@ -574,10 +585,7 @@ class Backend:
 		
 		:returns: Whether the user is authorized with said permission.
 		"""
-
-		actor = await self.get_member(key.issuer_id, key.application.economy.owner_guild_id) or StubUser(key.issuer_id)
-		return await self.has_permission(StubUser(key.key_id), permission, account, economy) \
-		   and await self.has_permission(actor, permission, account, economy)
+		return await self.has_permission(StubUser(key.key_id), permission, account, economy)
 
 	async def has_permission(self, user: User, permission: Permissions, account: Optional[Account] = None, economy: Optional[Economy] = None) -> bool:
 		"""
@@ -597,7 +605,7 @@ class Backend:
 		
 		async with self._sessionmaker() as session:
 			stmt = select(Permission) \
-				  .where(
+					.where(
 					and_(
 						Permission.permission == permission,
 						Permission.user_id.in_([user.id] + _get_roles(user)),
@@ -606,8 +614,8 @@ class Backend:
 							Permission.economy_id == economy.economy_id if economy else Permission.economy_id.is_(None)
 						)
 					)
-				  ) \
-				  .distinct()
+					) \
+					.distinct()
 
 			default = False
 			owner_id = account.owner_id if account is not None else None
@@ -765,22 +773,6 @@ class Backend:
 
 	# === API Keys ===
 
-	async def get_key(self, app: Application, ref_id: UUID) -> Optional[APIKey]:
-		"""
-		Fetch an API key by its application and custom reference UUID.
-		
-		:param app: The application which created the API key.
-		:param ref_id: The custom reference UUID supplied by the application.
-		:param _session: (optional) A pre-existing session to query with.
-		
-		:returns: The API key if it exists, else `None`.
-		"""
-		return await self._one_or_none(
-			select(APIKey)
-			.where(APIKey.application_id == app.application_id, APIKey.internal_app_id == ref_id)
-			.options(joinedload(APIKey.application).joinedload(Application.economy))
-		)
-
 	async def get_key_by_id(self, key_id: int) -> Optional[APIKey]:
 		"""
 		Fetch an API key by its ID.
@@ -792,28 +784,34 @@ class Backend:
 		return await self._one_or_none(
 			select(APIKey)
 			.where(APIKey.key_id == key_id)
-			.options(joinedload(APIKey.application).joinedload(Application.economy))
+			.options(joinedload(APIKey.application).joinedload(Application.economy), joinedload(APIKey.account))
 		)
 
-	async def initialize_key(self, app: Application, ref_id: UUID, issuer_id: int) -> APIKey:
+	async def create_key(self, app: Application, issuer_id: int, account: Optional[Account] = None, spending_limit: Optional[int] = None, key_type: KeyType = KeyType.GRANT, enable_by_default: bool = False) -> APIKey:
 		"""
-		Initialize a new API key.
+		Create a new API key.
 		
 		:param application: The application creating this API key.
 		:param ref_id: The custom reference UUID supplied by the application.
 		:param issuer_id: The user ID of the issuer of this key.
+		:param account: (optional) The account linked to this key.
+		:param spending_limit: (optional) The spending limit of this key.
+		:param key_type: The type of API key. Defaults to a grant API key.
+		:param enable_by_default: Whether to enable the API key by default. Defaults to `False`.
 		
 		:returns: The new API key.
 		"""
 		async with self._sessionmaker.begin() as session:
-			# check if a key with this ref. ID already exists
-			current_key = await self.get_key(app, ref_id)
-			if current_key:
-				await session.delete(current_key)
+			# fuck the person who invented detached instances ;-;
+			app = await session.merge(app)
+			if account:
+				account = await session.merge(account)
 
-			new_key = APIKey(application=app, internal_app_id=ref_id, issuer_id=issuer_id)
+			new_key = APIKey(application=app, issuer_id=issuer_id, account=account, spending_limit=spending_limit, type=key_type, enabled=enable_by_default)
 
 			session.add(new_key)
+
+			await session.flush()
 
 			session.add(
 				Transaction(
@@ -822,36 +820,52 @@ class Backend:
 					cud = CUD.CREATE, 
 					meta = {
 						"type": "API_KEY",
-						"application_id": app.application_id,
-						"ref_id": ref_id
+						"application_id": str(app.application_id),
+						"key_type": key_type,
+						"key_id": new_key.key_id
 					}
 				)
 			)
 
 		return new_key
 
-	async def delete_key(self, actor: User, key: APIKey):
+	async def enable_key(self, key: APIKey):
+		"""
+		Enable an API key.
+
+		:param key: The API key.
+		"""
+		async with self._sessionmaker.begin() as session:
+			session.add(key)
+			key.enabled = True
+
+	async def disable_key(self, key: APIKey):
+		"""
+		Disable an API key.
+
+		:param key: The API key.
+		"""
+		async with self._sessionmaker.begin() as session:
+			session.add(key)
+			key.enabled = False
+
+	async def delete_key(self, actor: HasID, key: APIKey):
 		"""
 		Delete an API key.
 		
 		:param actor: The actor of this action.
 		:param key: The API key.
-		
-		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
 		"""
-		if not await self.has_permission(actor, Permissions.MANAGE_ECONOMIES, economy=key.application.economy):
-			raise UnauthorizedException(f"You do not have permission to delete keys in this economy")
-		
 		async with self._sessionmaker.begin() as session:
 			session.add(
 				Transaction(
-					actor_id = actor.id, 
+					actor_id = actor.id,
 					action = Actions.UPDATE_ECONOMIES, 
 					cud = CUD.DELETE, 
 					meta = {
 						"type": "API_KEY",
-						"application_id": key.application.application_id,
-						"ref_id": key.internal_app_id
+						"application_id": str(key.application.application_id),
+						"key_id": key.key_id
 					}
 				)
 			)
@@ -1271,6 +1285,38 @@ class Backend:
 				)
 			)
 
+	async def change_key_permissions(self, key: APIKey, permissions: list[Permissions], account: Optional[Account] = None, economy: Optional[Economy] = None, allowed: bool = True):
+		"""
+		Changes many permissions of an API key at once.
+		
+		:param key: The API key.
+		:param user_id: The user ID of the affected user.
+		:param permissions: The list of permissions to change.
+		:param account: (optional) The account constraint of the permission.
+		:param economy: (optional) The economy constraint of the permission.
+		:param allowed: Whether the user is allowed these permissions or not. Defaults to True.
+		
+		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
+		"""
+		async with self._sessionmaker.begin() as session:
+			for permission in permissions:
+				await self._change_permission(key.key_id, permission, session, account, economy, allowed)
+
+			session.add(
+				Transaction(
+					actor_id = key.key_id,
+					economy_id = economy.economy_id if economy is not None else None,
+					target_account_id = account.account_id if account is not None else None,
+					action = Actions.UPDATE_PERMISSIONS,
+					cud = CUD.UPDATE,
+					meta = {
+						"affected_id": key.key_id,
+						"affected_permissions": permissions,
+						"allowed": allowed
+					}
+				)
+			)
+
 	# === Economies ===
 
 	async def get_economies(self) -> Sequence[Economy]:
@@ -1305,7 +1351,7 @@ class Backend:
 	async def create_economy(self, actor: discord.Member, currency_name: str, currency_unit: str) -> Economy:
 		"""
 		Creates a new economy tied to a guild.
-	   
+		 
 		:param actor: The member actor of this action.
 		:param currency_name: The name of the new economy's currency.
 		:param currency_unit: The unit/symbol of the new economy's currency.
@@ -1367,6 +1413,7 @@ class Backend:
 
 		async with self._sessionmaker.begin() as session:
 			await session.execute(delete(Guild).where(Guild.economy_id == economy.economy_id))
+			await session.execute(update(Account).where(Account.economy_id == economy.economy_id).values(deleted=True)) # can't really cascade a field to true, so we have to update when deleting
 			await session.delete(economy)
 			session.add(
 				Transaction(
@@ -1499,7 +1546,13 @@ class Backend:
 		:param account_id: The account UUID.
 		:returns: The account if it exists, else `None`.
 		"""
-		return await self._one_or_none(select(Account).where(Account.account_id == account_id).options(joinedload(Account.economy), selectinload(Account.update_notifiers)))
+		return await self._one_or_none(
+			select(Account)
+			.where(
+				Account.account_id == account_id,
+				Account.deleted == False)
+			.options(joinedload(Account.economy), selectinload(Account.update_notifiers))
+		)
 
 	async def create_account(self, actor: User, owner_id: Optional[int], economy: Economy, name: Optional[str] = None, account_type: AccountType = AccountType.USER) -> Account:
 		"""
@@ -1662,13 +1715,16 @@ class Backend:
 
 	# === Transactions ===
 
-	async def get_transaction_log(self, actor: User, account: Account, limit: Optional[int] = 10) -> Sequence[Transaction]:
+	async def get_transaction_log(self, actor: User, account: Account, limit: Optional[int] = 10, oldest_first: bool = False, before: Optional[float] = None, after: Optional[float] = None) -> Sequence[Transaction]:
 		"""
 		Fetches the transactions of an account.
 		
 		:param actor: The actor of this action.
 		:param account: The account to fetch transactions for.
 		:param limit: (optional) The number of transactions to fetch. Defaults to 10. Set to `None` to fetch all transactions (but be warned that this is an expensive operation).
+		:param oldest_first: Whether to sort transactions by oldest first. Defaults to `False`.
+		:param before: (optional) Fetch transactions made before this timestamp.
+		:param after: (optional) Fetch transactions made after this timestamp.
 		
 		:returns: A list of transactions.
 		
@@ -1678,9 +1734,7 @@ class Backend:
 			raise UnauthorizedException("You do not have the permission to view the transaction log of this account")
 
 		async with self._sessionmaker() as session:
-			return (
-				await session.execute(
-					select(Transaction)
+			stmt = select(Transaction) \
 					.options(
 						load_only(
 							Transaction.transaction_id,
@@ -1693,14 +1747,21 @@ class Backend:
 						),
 						joinedload(Transaction.target_account),
 						joinedload(Transaction.destination_account)
-					)
+					) \
 					.where(
 						(Transaction.target_account_id == account.account_id) | (Transaction.destination_account_id == account.account_id),
 						Transaction.action == Actions.TRANSFER
-					)
-					.limit(limit)
-					.order_by(Transaction.timestamp.desc())
-				)
+					) \
+					.limit(limit) \
+					.order_by(Transaction.timestamp.desc() if not oldest_first else Transaction.timestamp.asc())
+
+			if before:
+				stmt = stmt.where(Transaction.timestamp < datetime.fromtimestamp(before))
+			if after:
+				stmt = stmt.where(Transaction.timestamp > datetime.fromtimestamp(after))
+
+			return (
+				await session.execute(stmt)
 			).scalars().all()
 
 	async def create_reccuring_transfer(self, actor: User, 
@@ -1754,7 +1815,7 @@ class Backend:
 		if from_account not in session:
 			session.add(from_account)
 		if to_account not in session:
-			session.add(to_account)
+			to_account = await session.merge(to_account)
 
 		transaction = Transaction(
 			actor_id = actor.id,
@@ -1777,7 +1838,7 @@ class Backend:
 		await session.refresh(from_account, ["economy", "update_notifiers"])
 		await session.refresh(to_account, ["economy", "update_notifiers"])
 
-	async def perform_transaction(self, actor: User, 
+	async def perform_transaction(self, actor: User | APIKey, 
 		from_account: Account,
 		to_account: Account,
 		amount: int,
@@ -1794,7 +1855,10 @@ class Backend:
 		:raises UnauthorizedException: Raises an unauthorized exception if the actor is unauthorized to perform this action.
 		:raises ValueError: Raises a value error if the account transferring has insufficient funds.
 		"""
-		if not await self.has_permission(actor, Permissions.TRANSFER_FUNDS, account=from_account):
+		is_api = isinstance(actor, APIKey)
+		actor_ = StubUser(actor.key_id) if is_api else actor
+
+		if not await self.has_permission(actor_, Permissions.TRANSFER_FUNDS, account=from_account):
 			raise UnauthorizedException("You do not have the permission to transfer funds on this account")
 		elif from_account.economy_id != to_account.economy_id:
 			raise BackendException("Cannot transfer between different economies")
@@ -1804,17 +1868,23 @@ class Backend:
 			return
 
 		async with self._sessionmaker.begin() as session:
-			await self._perform_transaction(actor, from_account, to_account, amount, session, transaction_type)
+			await self._perform_transaction(actor_, from_account, to_account, amount, session, transaction_type)
+			
+			if is_api:
+				if actor not in session:
+					actor = await session.merge(actor)
+				actor.spent_to_date += amount
 
-		log = LogLevels.Private if not await self.has_permission(actor, Permissions.GOVERNMENT_OFFICIAL) else LogLevels.Public
+		log = LogLevels.Private if not await self.has_permission(actor_, Permissions.GOVERNMENT_OFFICIAL) else LogLevels.Public
 
-		logger.log(log, f"Economy: {from_account.economy.currency_name}\n<@!{actor.id}> transferred {frmt(amount)} from {from_account.account_name} to {to_account.account_name}. Transaction type: {transaction_type.name.upper()}")
-		await self.notify_users(to_account.get_update_notifiers(), f"<@!{actor.id}> transferred {frmt(amount)} from {from_account.account_name} to {to_account.account_name}, \nit's new balance is {to_account.get_balance()}", "Balance Update")
-		await self.notify_users(from_account.get_update_notifiers(), f"<@!{actor.id}> transferred {frmt(amount)} from an account you watch ({from_account.account_name}), to {to_account.account_name}\n{from_account.account_name}'s new balance is {from_account.get_balance()}", "Balance Update")
+		title = f"Application {actor.application.application_name}" if is_api else f"<@!{actor_.id}>" # type: ignore
+		logger.log(log, f"Economy: {from_account.economy.currency_name}\n{title} transferred {frmt(amount)} from {from_account.account_name} to {to_account.account_name}. Transaction type: {transaction_type.name.upper()}")
+		await self.notify_users(to_account.get_update_notifiers(), f"{title} transferred {frmt(amount)} from {from_account.account_name} to {to_account.account_name}, \nit's new balance is {to_account.get_balance()}", "Balance Update")
+		await self.notify_users(from_account.get_update_notifiers(), f"{title} transferred {frmt(amount)} from an account you watch ({from_account.account_name}), to {to_account.account_name}\n{from_account.account_name}'s new balance is {from_account.get_balance()}", "Balance Update")
 
 	# === Fund management ===
 
-	async def print_funds(self, actor: User, to_account: Account, amount: int):
+	async def print_funds(self, actor: User | APIKey, to_account: Account, amount: int):
 		"""
 		Prints funds to an account.
 		
@@ -1980,7 +2050,7 @@ class Backend:
 		await self.engine.dispose()
 
 	async def __aenter__(self):
-		await self.initalize() # ENSURE tables are created
+		await self.initialise() # ENSURE tables are created
 		return self
 	
 	async def __aexit__(self, exc_type, exc_v, _____):
@@ -1989,34 +2059,27 @@ class Backend:
 		# If it returns False, None, anything that evaluates as falsy, or nothing at all then the exception will continue to propagate.
 		# https://bbc.github.io/cloudfit-public-docs/asyncio/asyncio-part-3.html
 		try:
-			if isinstance(exc_v, (KeyboardInterrupt, asyncio.CancelledError)):
-				return
+			if exc_v and not isinstance(exc_v, (KeyboardInterrupt, asyncio.CancelledError)):
+				if not issubclass(exc_type, BackendException):
+					raise BackendException(exc_v) from exc_v
 
-			if exc_v:
-				print(exc_type)
-				if issubclass(exc_type, BackendException):
-					raise exc_v
-				else:
-					exc = BackendException(exc_v)
-					raise exc from exc_v
+			return exc_v
 		finally:
 			await self.close()
 
 if __name__ == "__main__":
 	import time
 
-	database_uri = "sqlite+aiosqlite:///database.db"
+	database_uri = "sqlite+aiosqlite:///database2.db"
 	async def main():
 		async with Backend(database_uri, poolclass=AsyncAdaptedQueuePool, echo=True) as backend:
 			stub = StubUser(809875420350119958)
 			stub.roles = [StubUser(1273953959458902129)]
 			start = time.perf_counter()
 
-			econ = await backend.get_economy_by_name("tau")
-			if econ:
-				acc = await backend.get_account_by_name("<@!809875420350119958> 's account", econ)
-				if acc:
-					result = await backend.get_transaction_log(stub, acc)
-					print(f"Result: {result} in {(time.perf_counter() - start) * 1000:.6f}ms")
+			result = await backend.get_authable_accounts(stub, [Permissions.TRANSFER_FUNDS])
+			print(f"Result: {result} in {(time.perf_counter() - start) * 1000:.6f}ms")
+			for acc in result:
+				print(acc.economy_id)
 
 	asyncio.run(main())
