@@ -31,9 +31,12 @@ logger = logging.getLogger(os.path.basename(__file__).split(".")[0])
 API_URL = "https://discord.com/api/v10"
 CALLBACK_URL = API_URL + "/oauth2/token"
 
+trusted_public_keys = {}
+private_key = ""
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    global trusted_public_keys, private_key
+    global private_key
 
     with open("./keys/jwt_key", "rb") as f:
         private_key = serialization.load_pem_private_key(f.read(), None)
@@ -44,7 +47,7 @@ async def lifespan(_: FastAPI):
     yield
 
 app = FastAPI(lifespan=lifespan)
-backend: Backend
+backend = Backend("")
 client: Optional[Client] = None
 
 try:
@@ -95,8 +98,6 @@ async def favicon():
     return FileResponse("./static/favicon.png")
 
 security = HTTPBearer(auto_error=False)
-trusted_public_keys = {}
-private_key = ""
 
 def generate_key(key_id: int, days_to_expire: int = 60):
     claims = {
@@ -179,8 +180,10 @@ async def create_reference(permissions: int, key: Annotated[APIKey, Depends(get_
         )
 
     app_id = key.application_id
-    perms = []
+    if not auth_store.get(app_id):
+        auth_store[app_id] = {}
 
+    perms = []
     if permissions > 0:
         perms = get_permissions(permissions)
         if not perms:
@@ -207,8 +210,10 @@ async def update_reference(key: Annotated[APIKey, Depends(get_typed_key(KeyType.
         )
 
     app_id = key.application_id
+    if not auth_store.get(app_id):
+        auth_store[app_id] = {}
+
     perms = []
-    
     if permissions and permissions > 0:
         perms = get_permissions(permissions)
         if not perms:

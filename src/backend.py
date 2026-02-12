@@ -3,7 +3,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, joinedload, load_only, mappe
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from datetime import datetime
 from enum import IntEnum
-from typing import Any, Optional, List, Protocol, Sequence, runtime_checkable, cast
+from typing import Any, Optional, List, Protocol, Union, Sequence, runtime_checkable, cast
 from uuid import UUID, uuid4
 import discord
 import logging
@@ -351,7 +351,7 @@ class HasRoles(Protocol):
 	id: int
 	roles: List[HasID]
 
-type User = HasID | HasRoles
+type User = Union[HasID, HasRoles]
 
 _get_roles = lambda u: [r.id for r in cast(HasRoles, u).roles] if isinstance(u, (HasRoles, discord.Member)) else []
 
