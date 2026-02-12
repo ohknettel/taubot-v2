@@ -10,15 +10,15 @@
 <meta property="og:title" content="API" />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://docs.taubot.qzz.io/api.html" />
-<meta property="og:site_name" content="Taubot V2 Documentation" />
-<meta property="og:description" content="Taubot exposes a HTTPS API available at https://taubot.qzz.io/api/. All data unless otherwise specified should be sent using JSON encoding. Authentication: DM SoTech Lon to get a master application..." />
+<meta property="og:site_name" content="Taubot V2.1 Documentation" />
+<meta property="og:description" content="Taubot V2.1 exposes an HTTPS API available at https://taubot.qzz.io/api, refered to in this documentation from here on out as TBAPI. The main usage of TBAPI is to enable applications and businesses..." />
 <meta property="og:image" content="https://docs.taubot.qzz.io/_static/logo.png" />
-<meta property="og:image:alt" content="Taubot V2 Documentation" />
-<meta name="description" content="Taubot exposes a HTTPS API available at https://taubot.qzz.io/api/. All data unless otherwise specified should be sent using JSON encoding. Authentication: DM SoTech Lon to get a master application..." />
+<meta property="og:image:alt" content="Taubot V2.1 Documentation" />
+<meta name="description" content="Taubot V2.1 exposes an HTTPS API available at https://taubot.qzz.io/api, refered to in this documentation from here on out as TBAPI. The main usage of TBAPI is to enable applications and businesses..." />
 <meta property="og:ignore_canonical" content="true" />
 <meta name="theme-color" content="#e8cc4c" />
 
-    <title>API &#8212; Taubot V2 Documentation  documentation</title>
+    <title>API &#8212; Taubot V2.1 Documentation  documentation</title>
   
   
   
@@ -55,7 +55,7 @@
     <link rel="icon" href="_static/favicon.png"/>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="prev" title="Usage" href="usage.html" />
+    <link rel="prev" title="Backend" href="backend.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   <meta name="docsearch:version" content="" />
@@ -128,7 +128,7 @@
     <img src="_static/logo.png" class="logo__image only-dark pst-js-only" alt=""/>
   
   
-    <p class="title logo__title">Taubot V2 Documentation</p>
+    <p class="title logo__title">Taubot V2.1 Documentation</p>
   
 </a></div>
     
@@ -145,6 +145,13 @@
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="usage.html">
     Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="backend.html">
+    Backend
   </a>
 </li>
 
@@ -235,6 +242,13 @@
 </li>
 
 
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="backend.html">
+    Backend
+  </a>
+</li>
+
+
 <li class="nav-item current active">
   <a class="nav-link nav-internal" href="#">
     API
@@ -317,13 +331,12 @@
                   
   <section id="api">
 <h1>API<a class="headerlink" href="#api" title="Link to this heading">#</a></h1>
-<p>Taubot exposes a HTTPS API available at <a class="reference external" href="https://taubot.qzz.io/api/">https://taubot.qzz.io/api/</a>.</p>
-<p>All data unless otherwise specified should be sent using JSON encoding.</p>
+<p>Taubot V2.1 exposes an HTTPS API available at <a class="reference external" href="https://taubot.qzz.io/api">https://taubot.qzz.io/api</a>, refered to in this documentation from here on out as TBAPI. The main usage of TBAPI is to enable applications and businesses to automate different aspects of Taubot such as transferring funds from one account to another.</p>
 <section id="authentication">
 <h2>Authentication<a class="headerlink" href="#authentication" title="Link to this heading">#</a></h2>
-<p>DM SoTech Lon to get a master application key and it’s associated application ID.</p>
-<p>Types of keys:</p>
-<div class="pst-scrollable-table-container"><table class="table">
+<p>Please fill out the <a class="reference external" href="https://forms.gle/hs1B1GZ9rFcCjSUi9">API application form</a> to request an application be made and a key to be provided.</p>
+<p>TBAPI relies on two kinds of API keys: <strong>Master</strong> and <strong>Grant</strong>.</p>
+<div class="pst-scrollable-table-container"><table class="table" id="keys">
 <colgroup>
 <col style="width: 50.0%" />
 <col style="width: 50.0%" />
@@ -334,91 +347,235 @@
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p>Master keys are issued to applications, if requested they can be granted certain taubot permissions, but are notable for their ability to create GRANT keys</p></td>
-<td><p>Grant keys are issued by a user to an application, it allows them to grant a subset of their taubot permissions to an application</p></td>
+<tr class="row-even"><td><p>Master keys are issued to applications and are notable for their ability to create <strong>Grant</strong> keys.</p></td>
+<td><p>Grant keys are issued to individuals by the Department of Technology in order to enable them to control their personal accounts. Primarily, they are issued by users to applications to grant the application a subset of permissions on a certain account.</p></td>
 </tr>
 </tbody>
 </table>
 </div>
-<p>The key being used to make a request should be set as the <code class="code docutils literal notranslate"><span class="pre">authorization</span></code> HTTP header.</p>
+<p>The key being used to make a request should be set as the <code class="code docutils literal notranslate"><span class="pre">Authorization</span></code> HTTP header, for example:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Authorization: Bearer YOUR_KEY_HERE
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><strong>Master keys expire in 60 days, while Grant keys expire in 90 days.</strong></p>
+</div>
 </section>
-<section id="oauth-like-flow-overview">
-<h2>Oauth-like flow overview<a class="headerlink" href="#oauth-like-flow-overview" title="Link to this heading">#</a></h2>
-<p>(name suggestions are greatly appreciated)</p>
-<p>This section pretains to the distribution of Grant Keys to applications.</p>
-<p>The flow is as follows:</p>
-<blockquote>
-<div><ol class="arabic simple">
-<li><p>Application initiates proccess py posting a UUID identifier to <code class="code docutils literal notranslate"><span class="pre">/api/oauth-references</span></code>, and sends the user a link containing the UUID in a query string along with their application ID.</p></li>
-<li><p>User clicks link and sets the grant scopes they wish to grant to the API.</p></li>
-<li><p>User returns to application and confirms that they’ve completed the grant process.</p></li>
-<li><p>Application gets <code class="code docutils literal notranslate"><span class="pre">/api/retrieve-key/{reference_id}</span></code> where reference ID is the ID they set in their post request.</p></li>
+<section id="app-authorization-flow-overview">
+<h2>App authorization flow overview<a class="headerlink" href="#app-authorization-flow-overview" title="Link to this heading">#</a></h2>
+<p>This section pertains to the creation of <strong>Grant</strong> keys by users for applications.</p>
+<p>This process ensures that users maintain full control over their spending limits while providing the application with a key to control their account.</p>
+<dl class="simple">
+<dt>The gist of the process is as follows:</dt><dd><ol class="arabic simple">
+<li><p>Application posts to the <a class="reference internal" href="#post--api-references-register" title="POST /api/references/register"><code class="xref http http-post docutils literal notranslate"><span class="pre">POST</span> <span class="pre">/api/references/register</span></code></a> endpoint, using a <strong>Master</strong> key with a query parameter of the permissions they wish to get, and receives a UUID.</p></li>
+<li><p>Application gives the user a manufactured grant link using the UUID from the response.</p></li>
+<li><p>User visits the grant link and authenticates with Discord.</p></li>
+<li><p>User sets their preferred spending limit and authorizes the application.</p></li>
+<li><p>User returns to application and confirms that they’ve completed the authorization process.</p></li>
+<li><p>Application retrieves their <strong>Grant</strong> key from <a class="reference internal" href="#get--api-references-ref_id" title="GET /api/references/{ref_id}"><code class="xref http http-get docutils literal notranslate"><span class="pre">GET</span> <span class="pre">/api/references/{ref_id}</span></code></a>, where <code class="code docutils literal notranslate"><span class="pre">ref_id</span></code> is the UUID from the application’s response in step 1.</p></li>
 </ol>
-</div></blockquote>
-<section id="starting-the-oauth-like-flow">
-<h3>Starting the oauth-like flow<a class="headerlink" href="#starting-the-oauth-like-flow" title="Link to this heading">#</a></h3>
-<p>As mentioned above the application should send a post request to <code class="code docutils literal notranslate"><span class="pre">/api/oauth-references</span></code>
-containing a UUID used to identify this particular flow.</p>
-<p>This UUID should be sent in the POST body json encoded with the key <code class="code docutils literal notranslate"><span class="pre">ref_id</span></code>.</p>
-<p>Afterwards, a URL should be sent to the user granting the application permissions. The same reference ID should be included in the querystring, labelled <code class="code docutils literal notranslate"><span class="pre">ref_id</span></code>. the application ID should also be sent in the querystring and labelled <code class="code docutils literal notranslate"><span class="pre">aid</span></code>.</p>
-<p><em>Example Python Code using requests</em></p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">uuid</span><span class="w"> </span><span class="kn">import</span> <span class="n">UUID</span>
-
-<span class="c1"># for obvious reasons these should be loaded from a config rather than hardcoded</span>
-<span class="n">master_key</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;master key goes here&quot;</span>
-<span class="n">application_id</span><span class="p">:</span> <span class="n">UUID</span> <span class="o">=</span> <span class="n">UUID</span><span class="p">(</span><span class="s2">&quot;application ID goes here&quot;</span><span class="p">)</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">get_auth_link</span><span class="p">(</span><span class="n">ref_id</span><span class="p">:</span> <span class="n">UUID</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-    <span class="n">resp</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span>
-         <span class="s2">&quot;https://taubot.qzz.io/api/oauth-references&quot;</span><span class="p">,</span>
-         <span class="n">data</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;ref_id&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">ref_id</span><span class="p">)},</span>
-         <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="n">master_key</span><span class="p">}</span>
-    <span class="p">)</span>
-    <span class="n">resp</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
-
-    <span class="c1"># since uuids are urlsafe this is fine</span>
-    <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;https://taubot.qzz.io/api/oauth/grant?ref=</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">ref_id</span><span class="p">)</span><span class="si">}</span><span class="s2">&amp;aid=</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">application_id</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+</dd>
+</dl>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><strong>The application has up to an hour from the completion of the first step to complete this process.</strong></p>
+</div>
+<p>More detailed explanations for the major parts of the process are provided below.</p>
+<section id="permissions">
+<h3>Permissions<a class="headerlink" href="#permissions" title="Link to this heading">#</a></h3>
+<p>TBAPI uses bitmasks to bundle multiple permissions into a single integer, similar to Discord’s authentication system for adding bots to servers.</p>
+<p>TBAPI currently allows applications to request the following permissions. These permissions are the same as <a class="reference internal" href="backend.html#permissions-bk"><span class="std std-ref">the permissions defined in the backend</span></a>. We may update this list in the future to allow applications to request more of Taubot’s permissions in accordance with demand, technical capabilities and security.</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 10.0%" />
+<col style="width: 70.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Constant</p></th>
+<th class="head"><p>Value</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">VIEW_BALANCE</span></code></p></td>
+<td><p><strong>1</strong></p></td>
+<td><p>Allows the application to view an account’s balance.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="code docutils literal notranslate"><span class="pre">TRANSFER_FUNDS</span></code></p></td>
+<td><p><strong>3</strong></p></td>
+<td><p>Allows the application to transfer funds from an account.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>For example, if an application wishes to request both <code class="code docutils literal notranslate"><span class="pre">VIEW_BALANCE</span></code> and <code class="code docutils literal notranslate"><span class="pre">TRANSFER_FUNDS</span></code>, the resulting bitmask will be <strong>10</strong>.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">1</span><span class="p">)</span> <span class="o">|</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">3</span><span class="p">)</span>
+<span class="go">10</span>
 </pre></div>
 </div>
-<p>Once the user has completed the grant process, they should inform the application somehow so that the application can then retrieve their token.</p>
 </section>
-<section id="retrieving-a-token">
-<h3>Retrieving a token<a class="headerlink" href="#retrieving-a-token" title="Link to this heading">#</a></h3>
-<p>Now that the user has confirmed with the application the token has been isued and it’s time for the application to retrieve it’s token</p>
-<p>This should be done by sending a get request to <code class="code docutils literal notranslate"><span class="pre">/api/retrieve-key/{ref_id}</span></code> where <code class="code docutils literal notranslate"><span class="pre">ref_id</span></code> is the same UUID used to initiate the claim process.</p>
-<p>The response will be json data with the new auth key set as the <code class="code docutils literal notranslate"><span class="pre">key</span></code> attribute.</p>
-<p>This key will have the same permissions the user set.</p>
-<p><em>Example Python code using requests</em></p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">uuid</span><span class="w"> </span><span class="kn">import</span> <span class="n">UUID</span>
-
-<span class="c1"># for obvious reasons these should be loaded from a config rather than hardcoded</span>
-<span class="n">master_key</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;master key goes here&quot;</span>
-<span class="n">application_id</span><span class="p">:</span> <span class="n">UUID</span> <span class="o">=</span> <span class="n">UUID</span><span class="p">(</span><span class="s2">&quot;application ID goes here&quot;</span><span class="p">)</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">retrieve_key</span><span class="p">(</span><span class="n">ref_id</span><span class="p">:</span> <span class="n">UUID</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-   <span class="c1"># since UUIDs are urlsafe this is fine</span>
-   <span class="n">resp</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-        <span class="sa">f</span><span class="s2">&quot;https://taubot.qzz.io/api/retrieve-key/</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">ref_id</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
-        <span class="n">headers</span> <span class="o">=</span> <span class="p">{}</span>
-   <span class="p">)</span>
-   <span class="n">resp</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
-
-   <span class="k">return</span> <span class="n">resp</span><span class="o">.</span><span class="n">json</span><span class="p">()[</span><span class="s2">&quot;key&quot;</span><span class="p">]</span>
+<section id="receiving-a-reference-uuid">
+<h3>Receiving a reference UUID<a class="headerlink" href="#receiving-a-reference-uuid" title="Link to this heading">#</a></h3>
+<p>As mentioned in the gist, the application must send a request to <a class="reference internal" href="#post--api-references-register" title="POST /api/references/register"><code class="xref http http-post docutils literal notranslate"><span class="pre">POST</span> <span class="pre">/api/references/register</span></code></a> endpoint through a <strong>Master</strong> key with a query parameter of the permissions they wish to get.</p>
+<section id="endpoints">
+<h4>Endpoints<a class="headerlink" href="#endpoints" title="Link to this heading">#</a></h4>
+<dl class="http post">
+<dt class="sig sig-object http" id="post--api-references-register">
+<span class="sig-name descname"><span class="pre">POST</span> </span><span class="sig-name descname"><span class="pre">/api/references/register</span></span><a class="headerlink" href="#post--api-references-register" title="Link to this definition">#</a></dt>
+<dd><div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This endpoint is limited to <a class="reference internal" href="#keys"><span class="std std-ref">Master keys</span></a> only.</p>
+</div>
+<p>Registers a create reference from a <strong>Master</strong> key.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Query Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>permissions</strong> – The required permissions integer bitmask.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Response JSON Object<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>uuid</strong> – A unique reference UUID.</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Status Codes<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1">200 OK</a></span> – Returns a reference UUID.</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.1">400 Bad Request</a></span> – Permissions bitmask is empty or malformed.</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.4">403 Forbidden</a></span> – Request was made with a <strong>Grant</strong> key instead of the original <strong>Master</strong> key.</p></li>
+</ul>
+</dd>
+</dl>
+<p><strong>Example Response (200 OK)</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;331fa966-33e4-4513-82ee-890f97e3f6ec&quot;</span>
+<span class="p">}</span>
 </pre></div>
 </div>
-<p>This token should be persisted somewhere, and used to make requests on behalf of the issuer.</p>
+</dd></dl>
+
+</section>
+</section>
+<section id="constructing-a-grant-url">
+<h3>Constructing a grant URL<a class="headerlink" href="#constructing-a-grant-url" title="Link to this heading">#</a></h3>
+<p>After receiving the reference UUID from the TBAPI, the application must construct a grant URL in the format <code class="code docutils literal notranslate"><span class="pre">/api/oauth/grant?ref_id={ref_id}&amp;app_id={app_id}</span></code>, where <code class="code docutils literal notranslate"><span class="pre">ref_id</span></code> is the reference UUID it received and <code class="code docutils literal notranslate"><span class="pre">app_id</span></code> is the application’s own ID, and give it to the user.</p>
+<p>Using the UUID from the above example response, this may look like:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>https://taubot.qzz.io/api/oauth/grant?ref_id=331fa966-33e4-4513-82ee-890f97e3f6ec&amp;app_id=02d60c91-3362-4dc5-8c55-0a69e8f35ed6
+</pre></div>
+</div>
+</section>
+<section id="authorization-on-the-user-s-end">
+<h3>Authorization on the user’s end<a class="headerlink" href="#authorization-on-the-user-s-end" title="Link to this heading">#</a></h3>
+<p>Once the user visits this grant URL, they will be redirected to Discord’s authentication page, and then to TBAPI’s grant page, where they are shown the permissions the application is requesting and are allowed to set a spending limit or disable the spending limit.</p>
+<figure class="align-default" id="id7">
+<img alt="_images/discord_oauth.png" src="_images/discord_oauth.png" />
+<figcaption>
+<p><span class="caption-text">Discord authenatication page</span><a class="headerlink" href="#id7" title="Link to this image">#</a></p>
+</figcaption>
+</figure>
+<figure class="align-default" id="id8">
+<img alt="_images/grant_unchecked.png" src="_images/grant_unchecked.png" />
+<figcaption>
+<p><span class="caption-text">TBAPI grant page</span><a class="headerlink" href="#id8" title="Link to this image">#</a></p>
+</figcaption>
+</figure>
+<figure class="align-default" id="id9">
+<img alt="_images/grant_checked.png" src="_images/grant_checked.png" />
+<figcaption>
+<p><span class="caption-text">Spending limit warning when disabled</span><a class="headerlink" href="#id9" title="Link to this image">#</a></p>
+</figcaption>
+</figure>
+<figure class="align-default" id="id10">
+<img alt="_images/authorized.png" src="_images/authorized.png" />
+<figcaption>
+<p><span class="caption-text">Authorization confirmation</span><a class="headerlink" href="#id10" title="Link to this image">#</a></p>
+</figcaption>
+</figure>
+</section>
+<section id="retrieving-the-grant-key">
+<h3>Retrieving the grant key<a class="headerlink" href="#retrieving-the-grant-key" title="Link to this heading">#</a></h3>
+<p>After the user has informed the application that they’ve authorized the application, the application must retrieve their <strong>Grant</strong> key by sending a request to <a class="reference internal" href="#get--api-references-ref_id" title="GET /api/references/{ref_id}"><code class="xref http http-get docutils literal notranslate"><span class="pre">GET</span> <span class="pre">/api/references/{ref_id}</span></code></a> with <code class="code docutils literal notranslate"><span class="pre">ref_id</span></code> replaced with the reference UUID the application received earlier.</p>
+<section id="id1">
+<h4>Endpoints<a class="headerlink" href="#id1" title="Link to this heading">#</a></h4>
+<dl class="http get">
+<dt class="sig sig-object http" id="get--api-references-ref_id">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/api/references/{ref_id}</span></span><a class="headerlink" href="#get--api-references-ref_id" title="Link to this definition">#</a></dt>
+<dd><p>Retrieves a reference’s <strong>Grant</strong> key. This request must be sent by the original <strong>Master</strong> key in case of registering the reference through <a class="reference internal" href="#post--api-references-register" title="POST /api/references/register"><code class="xref http http-post docutils literal notranslate"><span class="pre">POST</span> <span class="pre">/api/references/register</span></code></a>, or the pre-existing grant key in case of registering the reference through <a class="reference internal" href="#patch--api-references-register" title="PATCH /api/references/register"><code class="xref http http-patch docutils literal notranslate"><span class="pre">PATCH</span> <span class="pre">/api/references/register</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Path ref_id<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The reference UUID supplied by TBAPI.</p>
+</dd>
+<dt class="field-even">Status Codes<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1">200 OK</a></span> – Returns a <strong>Grant</strong> key.</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.1">400 Bad Request</a></span> – The reference UUID is invalid or malformed.</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.4">403 Forbidden</a></span> – The user has not yet authorized the application, or the request is made using the wrong type of key.</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.5">404 Not Found</a></span> – The reference was not found.</p></li>
+</ul>
+</dd>
+</dl>
+<p><strong>Example Response (200 OK)</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;key&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9...&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+</section>
+<section id="updating-the-grant-key">
+<h3>Updating the grant key<a class="headerlink" href="#updating-the-grant-key" title="Link to this heading">#</a></h3>
+<p>In case your application’s grant key has reached the spending limit, or you need access to more permissions than initally authorized, you can send a <a class="reference internal" href="#patch--api-references-register" title="PATCH /api/references/register"><code class="xref http http-patch docutils literal notranslate"><span class="pre">PATCH</span> <span class="pre">/api/references/register</span></code></a> request instead of creating a new grant key. At the end of the update process (which is the exact same as the authorization process), you will receive a new grant key, <strong>and the old grant key will be invalidated</strong>.</p>
+<section id="id2">
+<h4>Endpoints<a class="headerlink" href="#id2" title="Link to this heading">#</a></h4>
+<dl class="http patch">
+<dt class="sig sig-object http" id="patch--api-references-register">
+<span class="sig-name descname"><span class="pre">PATCH</span> </span><span class="sig-name descname"><span class="pre">/api/references/register</span></span><a class="headerlink" href="#patch--api-references-register" title="Link to this definition">#</a></dt>
+<dd><div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This endpoint is limited to <a class="reference internal" href="#keys"><span class="std std-ref">Grant keys</span></a> only.</p>
+</div>
+<p>Registers a update reference from a <strong>Grant</strong> key.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Query Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>permissions</strong> – <strong>(Optional)</strong> The required permissions integer bitmask.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Response JSON Object<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>uuid</strong> – A unique reference UUID.</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Status Codes<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1">200 OK</a></span> – Returns a reference UUID.</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.1">400 Bad Request</a></span> – Permissions bitmask is malformed.</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.4">403 Forbidden</a></span> – Request was made with a <strong>Master</strong> key instead of the pre-existing <strong>Grant</strong> key.</p></li>
+</ul>
+</dd>
+</dl>
+<p><strong>Example Response (200 OK)</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;5d92d48b-372f-4dd2-ac7d-01e87da5e4e6c&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
 </section>
 </section>
 <section id="api-reference">
-<h2>API Reference<a class="headerlink" href="#api-reference" title="Link to this heading">#</a></h2>
+<h2>API reference<a class="headerlink" href="#api-reference" title="Link to this heading">#</a></h2>
 <section id="response-types">
 <h3>Response Types<a class="headerlink" href="#response-types" title="Link to this heading">#</a></h3>
 <section id="application">
-<h4>Application<a class="headerlink" href="#application" title="Link to this heading">#</a></h4>
-<div class="pst-scrollable-table-container"><table class="table" id="id1">
-<caption><span class="caption-text">Application Response Structure</span><a class="headerlink" href="#id1" title="Link to this table">#</a></caption>
+<span id="id3"></span><h4>Application<a class="headerlink" href="#application" title="Link to this heading">#</a></h4>
+<div class="pst-scrollable-table-container"><table class="table">
 <colgroup>
 <col style="width: 22.2%" />
 <col style="width: 22.2%" />
@@ -431,9 +588,9 @@ containing a UUID used to identify this particular flow.</p>
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><th class="stub"><p>id</p></th>
+<tr class="row-even"><th class="stub"><p>application_id</p></th>
 <td><p>String</p></td>
-<td><p>The application’s UUID encoded as a string</p></td>
+<td><p>The application’s UUID, encoded as a string</p></td>
 </tr>
 <tr class="row-odd"><th class="stub"><p>application_name</p></th>
 <td><p>String</p></td>
@@ -441,24 +598,23 @@ containing a UUID used to identify this particular flow.</p>
 </tr>
 <tr class="row-even"><th class="stub"><p>economy_name</p></th>
 <td><p>String</p></td>
-<td><p>The name of the currency of the application’s economy</p></td>
+<td><p>The application’s economy currency name</p></td>
 </tr>
 <tr class="row-odd"><th class="stub"><p>economy_id</p></th>
 <td><p>String</p></td>
-<td><p>The application economy’s UUID encoded as a stringy</p></td>
+<td><p>The application economy’s UUID, encoded as a string</p></td>
 </tr>
 <tr class="row-even"><th class="stub"><p>owner_id</p></th>
 <td><p>String</p></td>
-<td><p>The owner’s discord id encoded as a string since some programming languages can mess up ints that big</p></td>
+<td><p>The application owner’s ID, encoded as a string</p></td>
 </tr>
 </tbody>
 </table>
 </div>
 </section>
 <section id="account">
-<h4>Account<a class="headerlink" href="#account" title="Link to this heading">#</a></h4>
-<div class="pst-scrollable-table-container"><table class="table" id="id2">
-<caption><span class="caption-text">Account Response Structure</span><a class="headerlink" href="#id2" title="Link to this table">#</a></caption>
+<span id="id4"></span><h4>Account<a class="headerlink" href="#account" title="Link to this heading">#</a></h4>
+<div class="pst-scrollable-table-container"><table class="table">
 <colgroup>
 <col style="width: 22.2%" />
 <col style="width: 22.2%" />
@@ -473,11 +629,11 @@ containing a UUID used to identify this particular flow.</p>
 <tbody>
 <tr class="row-even"><th class="stub"><p>account_id</p></th>
 <td><p>String</p></td>
-<td><p>The account’s UUID encoded as a string</p></td>
+<td><p>The account’s UUID, encoded as a string</p></td>
 </tr>
 <tr class="row-odd"><th class="stub"><p>owner_id</p></th>
 <td><p>String</p></td>
-<td><p>The owner’s discord id encoded as a string since some programming languages can mess up ints that big</p></td>
+<td><p>The account owner’s ID, encoded as a string</p></td>
 </tr>
 <tr class="row-even"><th class="stub"><p>account_name</p></th>
 <td><p>String</p></td>
@@ -485,50 +641,19 @@ containing a UUID used to identify this particular flow.</p>
 </tr>
 <tr class="row-odd"><th class="stub"><p>account_type</p></th>
 <td><p>String</p></td>
-<td><p>The type of account, see the Account Type section below for more info</p></td>
+<td><p>The type of account</p></td>
 </tr>
 <tr class="row-even"><th class="stub"><p>balance</p></th>
 <td><p>Integer</p></td>
-<td><p>The balance of the account in cents - i.e. 100 would be 1t and 101 would be 1.01t</p></td>
-</tr>
-</tbody>
-</table>
-</div>
-</section>
-<section id="account-type">
-<h4>Account Type<a class="headerlink" href="#account-type" title="Link to this heading">#</a></h4>
-<div class="pst-scrollable-table-container"><table class="table" id="id3">
-<caption><span class="caption-text">Account Type</span><a class="headerlink" href="#id3" title="Link to this table">#</a></caption>
-<colgroup>
-<col style="width: 28.6%" />
-<col style="width: 71.4%" />
-</colgroup>
-<thead>
-<tr class="row-odd"><th class="head stub"><p>Name</p></th>
-<th class="head"><p>Description</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><th class="stub"><p>USER</p></th>
-<td><p>An account type used to represent user accounts on the discord, is used exclusively for personal accounts</p></td>
-</tr>
-<tr class="row-odd"><th class="stub"><p>GOVERNMENT</p></th>
-<td><p>An account type used to represent government accounts</p></td>
-</tr>
-<tr class="row-even"><th class="stub"><p>CORPORATION</p></th>
-<td><p>An account type used to represent corporate accounts</p></td>
-</tr>
-<tr class="row-odd"><th class="stub"><p>CHARITY</p></th>
-<td><p>An account type used by non-profit accounts</p></td>
+<td><p>The balance of the account in cents (for example: 100 would be 1 of a currency and 101 would be 1.01 of a currency)</p></td>
 </tr>
 </tbody>
 </table>
 </div>
 </section>
 <section id="transaction">
-<h4>Transaction<a class="headerlink" href="#transaction" title="Link to this heading">#</a></h4>
-<div class="pst-scrollable-table-container"><table class="table" id="id4">
-<caption><span class="caption-text">Transaction</span><a class="headerlink" href="#id4" title="Link to this table">#</a></caption>
+<span id="id5"></span><h4>Transaction<a class="headerlink" href="#transaction" title="Link to this heading">#</a></h4>
+<div class="pst-scrollable-table-container"><table class="table">
 <colgroup>
 <col style="width: 22.2%" />
 <col style="width: 22.2%" />
@@ -543,19 +668,19 @@ containing a UUID used to identify this particular flow.</p>
 <tbody>
 <tr class="row-even"><th class="stub"><p>actor_id</p></th>
 <td><p>String</p></td>
-<td><p>The person who performed the transactions discord user id encoded as a string</p></td>
+<td><p>The ID of the user or API key that performed this transaction, encoded as a string</p></td>
 </tr>
 <tr class="row-odd"><th class="stub"><p>timestamp</p></th>
-<td><p>Integer</p></td>
-<td><p>The unix timestamp of when the transaction took place</p></td>
+<td><p>Double</p></td>
+<td><p>The Unix timestamp of when the transaction took place, returned as a float</p></td>
 </tr>
 <tr class="row-even"><th class="stub"><p>from_account</p></th>
 <td><p>String</p></td>
-<td><p>The account UUID of the account the money was transferred from</p></td>
+<td><p>The account UUID of the account the money was transferred from, encoded as a string</p></td>
 </tr>
 <tr class="row-odd"><th class="stub"><p>to_account</p></th>
 <td><p>String</p></td>
-<td><p>The account UUID of the account the money was sent to</p></td>
+<td><p>The account UUID of the account the money was sent to, encoded as a string</p></td>
 </tr>
 <tr class="row-even"><th class="stub"><p>amount</p></th>
 <td><p>Integer</p></td>
@@ -566,104 +691,246 @@ containing a UUID used to identify this particular flow.</p>
 </div>
 </section>
 </section>
-<section id="endpoints">
-<h3>Endpoints<a class="headerlink" href="#endpoints" title="Link to this heading">#</a></h3>
-<p>Here’s an overview of all the requests you can currently make to the API.</p>
+<section id="id6">
+<h3>Endpoints<a class="headerlink" href="#id6" title="Link to this heading">#</a></h3>
 <dl class="http get">
-<dt class="sig sig-object http" id="get--api-applications-me">
-<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/api/applications/me</span></span><a class="headerlink" href="#get--api-applications-me" title="Link to this definition">#</a></dt>
-<dd><p>Returns information about the current application.</p>
+<dt class="sig sig-object http" id="get--api-applications-app_id">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/api/applications/{app_id}</span></span><a class="headerlink" href="#get--api-applications-app_id" title="Link to this definition">#</a></dt>
+<dd><p>Gets an application by its UUID.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Status Codes<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1">200 OK</a></span> – Returns an Application object</p></li>
+<dt class="field-odd">Path app_id<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The application’s UUID or <code class="code docutils literal notranslate"><span class="pre">me</span></code> for the requesting key’s application.</p>
+</dd>
+<dt class="field-even">Status Codes<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1">200 OK</a></span> – Returns an <a class="reference internal" href="#application"><span class="std std-ref">Application</span></a> object.</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.1">400 Bad Request</a></span> – Application UUID is invalid or malformed.</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.5">404 Not Found</a></span> – Application not found.</p></li>
 </ul>
 </dd>
 </dl>
+<p><strong>Example Response (200 OK)</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;application_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;f47ac10b-58cc-4372-a567-0e02b2c3d479&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;application_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;test&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;economy_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;test&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;economy_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;af93101b-8301-4f97-96b5-dcfa9a28f90a&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;owner_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;809875420350119958&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
 </dd></dl>
 
 <dl class="http get">
-<dt class="sig sig-object http" id="get--api-users-(int-user_id)">
-<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/api/users/</span></span><span class="sig-paren">(</span><em class="property"><span class="pre">int:</span> </em><em class="sig-param"><span class="pre">user_id</span></em><span class="sig-paren">)</span><a class="headerlink" href="#get--api-users-(int-user_id)" title="Link to this definition">#</a></dt>
-<dd><p>Returns the personal account of <code class="code docutils literal notranslate"><span class="pre">user_id</span></code> if it could be found.</p>
+<dt class="sig sig-object http" id="get--api-applications-users-user_id">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/api/applications/users/{user_id}</span></span><a class="headerlink" href="#get--api-applications-users-user_id" title="Link to this definition">#</a></dt>
+<dd><p>Gets a user’s applications.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Status Codes<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1">200 OK</a></span> – Returns an Account object</p></li>
-<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.5">404 Not Found</a></span> – A personal account registered to that user could not be found.</p></li>
+<dt class="field-odd">Path user_id<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The user’s Discord ID.</p>
+</dd>
+<dt class="field-even">Status Codes<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1">200 OK</a></span> – Returns a list of <a class="reference internal" href="#application"><span class="std std-ref">Application</span></a> objects.</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.1">400 Bad Request</a></span> – User ID is a non-integer value.</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.4">403 Forbidden</a></span> – The requesting key does not have the permission to view user applications (<code class="code docutils literal notranslate"><span class="pre">MANAGE_ECONOMIES</span></code>).</p></li>
 </ul>
 </dd>
 </dl>
+<p><strong>Example Response (200 OK)</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">     </span><span class="nt">&quot;application_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;f47ac10b-58cc-4372-a567-0e02b2c3d479&quot;</span><span class="p">,</span>
+<span class="w">     </span><span class="nt">&quot;application_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;test&quot;</span><span class="p">,</span>
+<span class="w">     </span><span class="nt">&quot;economy_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;test&quot;</span><span class="p">,</span>
+<span class="w">     </span><span class="nt">&quot;economy_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;af93101b-8301-4f97-96b5-dcfa9a28f90a&quot;</span><span class="p">,</span>
+<span class="w">     </span><span class="nt">&quot;owner_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;809875420350119958&quot;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
 </dd></dl>
 
 <dl class="http get">
-<dt class="sig sig-object http" id="get--api-accounts-by-name-(str-account_name)">
-<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/api/accounts/by-name/</span></span><span class="sig-paren">(</span><em class="property"><span class="pre">str:</span> </em><em class="sig-param"><span class="pre">account_name</span></em><span class="sig-paren">)</span><a class="headerlink" href="#get--api-accounts-by-name-(str-account_name)" title="Link to this definition">#</a></dt>
-<dd><p>Returns the account of name <code class="code docutils literal notranslate"><span class="pre">account_name</span></code> if it could be found</p>
-<dl class="field-list simple">
-<dt class="field-odd">Status Codes<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1">200 OK</a></span> – Returns an Account object</p></li>
-<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.5">404 Not Found</a></span> – An account by that name could not be found</p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="http get">
-<dt class="sig sig-object http" id="get--api-accounts-(UUID-account_id)">
-<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/api/accounts/</span></span><span class="sig-paren">(</span><em class="property"><span class="pre">UUID:</span> </em><em class="sig-param"><span class="pre">account_id</span></em><span class="sig-paren">)</span><a class="headerlink" href="#get--api-accounts-(UUID-account_id)" title="Link to this definition">#</a></dt>
-<dd><p>Returns the account of uuid <code class="code docutils literal notranslate"><span class="pre">account_id</span></code> if it could be found</p>
-<dl class="field-list simple">
-<dt class="field-odd">Status Codes<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1">200 OK</a></span> – Retruns an Account object</p></li>
-<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.5">404 Not Found</a></span> – An account by that name could not be found</p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="http get">
-<dt class="sig sig-object http" id="get--api-accounts-(UUID-account_id)-transactions">
-<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/api/accounts/</span></span><span class="sig-paren">(</span><em class="property"><span class="pre">UUID:</span> </em><em class="sig-param"><span class="pre">account_id</span></em><span class="sig-paren">)</span><span class="sig-name descname"><span class="pre">/transactions</span></span><a class="headerlink" href="#get--api-accounts-(UUID-account_id)-transactions" title="Link to this definition">#</a></dt>
-<dd><p>Returns a list of the Transactions to and from that account</p>
+<dt class="sig sig-object http" id="get--api-accounts">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/api/accounts</span></span><a class="headerlink" href="#get--api-accounts" title="Link to this definition">#</a></dt>
+<dd><p>Gets an account matching a specific name or owned by a specific user. <strong>Only one query parameter must be provided.</strong></p>
 <dl class="field-list simple">
 <dt class="field-odd">Query Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>limit</strong> – optional limit paramater, specifies the maximum number of transactions to return</p></li>
+<li><p><strong>user_id</strong> – The user’s Discord ID.</p></li>
+<li><p><strong>name</strong> – The account’s name.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Status Codes<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
-<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1">200 OK</a></span> – Returns a JSON list of Transaction objects</p></li>
-<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.5">404 Not Found</a></span> – The account specified could not be found</p></li>
-<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.2">401 Unauthorized</a></span> – You do not have the necessary permissions (<code class="code docutils literal notranslate"><span class="pre">VIEW_BALANCE</span></code>) to view the transaction log</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1">200 OK</a></span> – Returns an <a class="reference internal" href="#account"><span class="std std-ref">Account</span></a> object.</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.1">400 Bad Request</a></span> – Both or neither of <code class="code docutils literal notranslate"><span class="pre">user_id</span></code> and :<cite>name</cite> were entered, or the user ID is a non-integer value.</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.5">404 Not Found</a></span> – Account not found.</p></li>
 </ul>
 </dd>
 </dl>
+<p><strong>Example Request (HTTP)</strong></p>
+<div class="highlight-http notranslate"><div class="highlight"><pre><span></span><span class="nf">GET</span> <span class="nn">/api/accounts?user_id=809875420350119958</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+<span class="na">Host</span><span class="o">:</span> <span class="l">taubot.qzz.io</span>
+<span class="na">Authorization</span><span class="o">:</span> <span class="l">Bearer ...</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The requesting key must have the <code class="code docutils literal notranslate"><span class="pre">VIEW_BALANCE</span></code> permission to get the account’s balance, else the balance returned will be <code class="code docutils literal notranslate"><span class="pre">null</span></code>.</p>
+</div>
+<p><strong>Example Response (200 OK)</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;account_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;021b1643-fcec-4cbb-bc00-ea136155e2e8&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;owner_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;809875420350119958&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;account_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&lt;@!809875420350119958&gt;&#39;s account&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;account_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;USER&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;balance&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="http get">
+<dt class="sig sig-object http" id="get--api-accounts-acc_id">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/api/accounts/{acc_id}</span></span><a class="headerlink" href="#get--api-accounts-acc_id" title="Link to this definition">#</a></dt>
+<dd><p>Gets an account by its UUID.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Path acc_id<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The account’s UUID.</p>
+</dd>
+<dt class="field-even">Status Codes<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1">200 OK</a></span> – Returns an <a class="reference internal" href="#account"><span class="std std-ref">Account</span></a> object.</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.1">400 Bad Request</a></span> – Account UUID is invalid or malformed.</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.5">404 Not Found</a></span> – Account not found.</p></li>
+</ul>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The requesting key must have the <code class="code docutils literal notranslate"><span class="pre">VIEW_BALANCE</span></code> permission to get the account’s balance, else the balance returned will be <code class="code docutils literal notranslate"><span class="pre">null</span></code>.</p>
+</div>
+<p><strong>Example Response (200 OK)</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;account_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;021b1643-fcec-4cbb-bc00-ea136155e2e8&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;owner_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;809875420350119958&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;account_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&lt;@!809875420350119958&gt;&#39;s account&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;account_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;USER&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;balance&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span>
+<span class="p">}</span>
+</pre></div>
+</div>
 </dd></dl>
 
 <dl class="http post">
-<dt class="sig sig-object http" id="post--api-transactions-">
-<span class="sig-name descname"><span class="pre">POST</span> </span><span class="sig-name descname"><span class="pre">/api/transactions/</span></span><a class="headerlink" href="#post--api-transactions-" title="Link to this definition">#</a></dt>
-<dd><p>Creates a new transaction</p>
+<dt class="sig sig-object http" id="post--api-transactions-create">
+<span class="sig-name descname"><span class="pre">POST</span> </span><span class="sig-name descname"><span class="pre">/api/transactions/create</span></span><a class="headerlink" href="#post--api-transactions-create" title="Link to this definition">#</a></dt>
+<dd><div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This endpoint is limited to <a class="reference internal" href="#keys"><span class="std std-ref">Grant keys</span></a> only.</p>
+</div>
+<p>Creates a new transaction; i.e. transfers fund from the requesting key’s account to another account.</p>
 <dl class="field-list simple">
 <dt class="field-odd">JSON Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>from_account</strong> (<em>string</em>) – The account UUID to transfer money from</p></li>
-<li><p><strong>to_account</strong> (<em>string</em>) – The account UUID to transfer money to</p></li>
-<li><p><strong>amount</strong> (<em>int</em>) – The amount in cents to transfer</p></li>
+<li><p><strong>to_account_id</strong> – The UUID of the destination account.</p></li>
+<li><p><strong>amount</strong> – The amount to transfer in cents.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Status Codes<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
-<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1">200 OK</a></span> – Transaction was created sucessfully</p></li>
-<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.5">404 Not Found</a></span> – One of the accounts could not be found</p></li>
-<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.2">401 Unauthorized</a></span> – Your key doesn’t grant you sufficient permissions to make this transaction</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1">200 OK</a></span> – Transaction is successful.</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.1">400 Bad Request</a></span> – To account UUID is invalid or malformed.</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.4">403 Forbidden</a></span> – <strong>Error code 1000</strong> - Cannot transfer from and to the same account.</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.4">403 Forbidden</a></span> – <strong>Error code 1001</strong> - Insufficient funds.</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.4">403 Forbidden</a></span> – <strong>Error code 1002</strong> - Spending limit reached.</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.5">404 Not Found</a></span> – To account not found.</p></li>
 </ul>
 </dd>
 </dl>
+<p><strong>Example Request Body</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;to_account_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;021b1643-fcec-4cbb-bc00-ea136155e2e8&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;amount&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">10000</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Example Response (403 Forbidden)</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;error_code&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1000</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;detail&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Cannot transfer from and to the same account&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Example Response (200 OK)</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;detail&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Successfully performed transaction&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="http get">
+<dt class="sig sig-object http" id="get--api-transactions">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/api/transactions</span></span><a class="headerlink" href="#get--api-transactions" title="Link to this definition">#</a></dt>
+<dd><div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This endpoint is limited to <a class="reference internal" href="#keys"><span class="std std-ref">Grant keys</span></a> only.</p>
+</div>
+<p>Get the transactions of the requesting key’s account.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Query Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>limit</strong> – <strong>(Optional)</strong> The amount of transactions to return. Must be greater than 0 and less than 100.</p></li>
+<li><p><strong>sort</strong> – <strong>(Optional)</strong> Whether to sort the transactions in ascending or descending order of date. <code class="code docutils literal notranslate"><span class="pre">0</span></code> - newest first, <code class="code docutils literal notranslate"><span class="pre">1</span></code> - oldest first.</p></li>
+<li><p><strong>before</strong> – <strong>(Optional)</strong> Filter transactions made before a float timestamp.</p></li>
+<li><p><strong>after</strong> – <strong>(Optional)</strong> Filter transactions made after a float timestamp.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Status Codes<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1">200 OK</a></span> – Returns a list of <a class="reference internal" href="#transaction"><span class="std std-ref">Transaction</span></a> objects.</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.1">400 Bad Request</a></span> – <strong>Error code 2000</strong> - Invalid sort mode.</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.1">400 Bad Request</a></span> – <strong>Error code 2001</strong> - Limit is less than or equal to 0.</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.1">400 Bad Request</a></span> – <strong>Error code 2002</strong> - Limit is greater than 100.</p></li>
+<li><p><span><a class="reference external" href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.4">403 Forbidden</a></span> – The requesting key does not have the permission to view transactions (<code class="code docutils literal notranslate"><span class="pre">VIEW_BALANCE</span></code>).</p></li>
+</ul>
+</dd>
+</dl>
+<p><strong>Example Request (HTTP)</strong></p>
+<div class="highlight-http notranslate"><div class="highlight"><pre><span></span><span class="nf">GET</span> <span class="nn">/api/transactions?limit=10&amp;sort=1</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+<span class="na">Host</span><span class="o">:</span> <span class="l">taubot.qzz.io</span>
+<span class="na">Authorization</span><span class="o">:</span> <span class="l">Bearer ...</span>
+</pre></div>
+</div>
+<p><strong>Example Response (403 Forbidden)</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;error_code&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2000</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;detail&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Sort mode must be either: 0 - newest first, 1 - oldest first&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Example Response (200 OK)</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;actor_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1770647320.966851</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;from_account&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;021b1643-fcec-4cbb-bc00-ea136155e2e8&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;to_account&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;d107dd80-54de-4537-bd0c-fb63b9b0aff6&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;amount&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">300</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;actor_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;3&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1770632032.316085</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;from_account&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;021b1643-fcec-4cbb-bc00-ea136155e2e8&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;to_account&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;d107dd80-54de-4537-bd0c-fb63b9b0aff6&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;amount&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">30000</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
 </dd></dl>
 
 </section>
@@ -681,12 +948,12 @@ containing a UUID used to identify this particular flow.</p>
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="usage.html"
+       href="backend.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">Usage</p>
+        <p class="prev-next-title">Backend</p>
       </div>
     </a>
 </div>
@@ -709,20 +976,32 @@ containing a UUID used to identify this particular flow.</p>
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#authentication">Authentication</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#oauth-like-flow-overview">Oauth-like flow overview</a><ul class="nav section-nav flex-column">
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#starting-the-oauth-like-flow">Starting the oauth-like flow</a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#retrieving-a-token">Retrieving a token</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#app-authorization-flow-overview">App authorization flow overview</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#permissions">Permissions</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#receiving-a-reference-uuid">Receiving a reference UUID</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#endpoints">Endpoints</a></li>
 </ul>
 </li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#api-reference">API Reference</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#constructing-a-grant-url">Constructing a grant URL</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#authorization-on-the-user-s-end">Authorization on the user’s end</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#retrieving-the-grant-key">Retrieving the grant key</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#id1">Endpoints</a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#updating-the-grant-key">Updating the grant key</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#id2">Endpoints</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#api-reference">API reference</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#response-types">Response Types</a><ul class="nav section-nav flex-column">
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#application">Application</a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#account">Account</a></li>
-<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#account-type">Account Type</a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#transaction">Transaction</a></li>
 </ul>
 </li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#endpoints">Endpoints</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id6">Endpoints</a></li>
 </ul>
 </li>
 </ul>
@@ -753,7 +1032,7 @@ containing a UUID used to identify this particular flow.</p>
 
   <p class="copyright">
     
-      © Copyright 2025, Some Stoner.
+      © Copyright 2026, Some Stoner.
       <br/>
     
   </p>
